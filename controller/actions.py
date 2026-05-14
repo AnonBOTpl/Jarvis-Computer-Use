@@ -22,3 +22,13 @@ def press_key(key: str):
     Naciska i zwalnia pojedynczy klawisz na klawiaturze (np. 'enter', 'tab', 'esc').
     """
     pyautogui.press(key)
+
+import pyperclip
+
+def copy_to_clipboard(text: str):
+    """Kopiuje podany tekst do systemowego schowka."""
+    pyperclip.copy(text)
+
+def get_from_clipboard() -> str:
+    """Zwraca zawartość systemowego schowka."""
+    return pyperclip.paste()

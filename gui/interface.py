@@ -4,10 +4,12 @@ import threading
 import os
 import subprocess
 from gui.settings import SettingsWindow, load_config
-from vision.screen_capture import capture_screen
-from controller.actions import click_at, type_text, press_key
+from vision.screen_capture import capture_screen, capture_window_roi
+from controller.actions import click_at, type_text, press_key, copy_to_clipboard
 from discovery.app_scanner import AppScanner
 from ai_engine.brain import JarvisBrain
+from memory.knowledge_base import KnowledgeBase
+from vision.ocr_engine import is_text_visible
 
 class JarvisApp(ctk.CTk):
     """Główne okno aplikacji Jarvis - Agent AI."""
@@ -37,7 +39,7 @@ class JarvisApp(ctk.CTk):
         # 1. Górny pasek - Stan i Statystyki systemu
         self.top_bar_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.top_bar_frame.grid(row=0, column=0, sticky="ew")
-        self.top_bar_frame.grid_columnconfigure(1, weight=1)
+        self.top_bar_frame.grid_columnconfigure(2, weight=1)
 
         self.status_label = ctk.CTkLabel(
             self.top_bar_frame,
@@ -71,15 +73,34 @@ class JarvisApp(ctk.CTk):
         )
         self.settings_button.grid(row=0, column=3, padx=(0, 10), pady=(10, 5), sticky="e")
 
-        # 2. Obszar logów akcji (pole tekstowe z przewijaniem)
+        # Przycisk Bocznego Panelu "Ostatnie Akcje"
+        self.sidebar_button = ctk.CTkButton(
+            self.top_bar_frame,
+            text="Ostatnie Akcje",
+            command=self.toggle_sidebar,
+            width=120
+        )
+        self.sidebar_button.grid(row=0, column=4, padx=(0, 10), pady=(10, 5), sticky="e")
+
+        # --- Obszar dzielący na Logi (lewo) i Panel Akcji (prawo) ---
+        self.content_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        self.content_frame.grid(row=1, column=0, padx=0, pady=0, sticky="nsew")
+        self.content_frame.grid_columnconfigure(0, weight=1)
+        self.content_frame.grid_rowconfigure(0, weight=1)
+
+        # 2. Obszar logów akcji (pole tekstowe z przewijaniem) w środku nowej ramki
         self.log_textbox = ctk.CTkTextbox(
-            self.main_frame,
+            self.content_frame,
             wrap="word",
             font=ctk.CTkFont(size=12)
         )
-        self.log_textbox.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
+        self.log_textbox.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
         self.log_textbox.insert("0.0", "--- Rozpoczęto działanie systemu Jarvis ---\n")
         self.log_textbox.configure(state="disabled") # Tylko do odczytu
+
+        # Panel boczny na ostanie akcje i zapis z pamięci
+        self.sidebar_frame = ctk.CTkScrollableFrame(self.content_frame, width=200, label_text="Złota Lista")
+        self.sidebar_visible = False
 
         # ----------------------------------------------------
         # RAMKA DOLNA (POLE TEKSTOWE I PRZYCISKI)
@@ -119,9 +140,13 @@ class JarvisApp(ctk.CTk):
         self.update_system_stats()
 
         # Inicjalizacja modułów Jarvis
+        self.knowledge_base = KnowledgeBase()
         self.app_scanner = AppScanner()
         self.brain = None
+        self.last_query = ""
+        self.last_actions = []
         self._init_brain()
+        self._refresh_sidebar()
 
     def _init_brain(self):
         """Próbuje zainicjalizować moduł JarvisBrain na podstawie konfiguracji."""
@@ -152,6 +177,46 @@ class JarvisApp(ctk.CTk):
         self.log_message("[SYSTEM]: Ustawienia zostały zaktualizowane.")
         self._init_brain()
 
+    def toggle_sidebar(self):
+        """Wysuwa/Chowa boczny panel akcji."""
+        if self.sidebar_visible:
+            self.sidebar_frame.grid_forget()
+            self.sidebar_visible = False
+        else:
+            self.sidebar_frame.grid(row=0, column=1, padx=(0, 10), pady=10, sticky="nsew")
+            self.sidebar_visible = True
+
+    def _refresh_sidebar(self):
+        """Odświeża listę akcji ze złotej bazy z przyciskami (usuwanie/uruchamianie)."""
+        # Wyczyszczenie dotychczasowych elementów panelu bocznego
+        for widget in self.sidebar_frame.winfo_children():
+            widget.destroy()
+
+        for query, actions in self.knowledge_base.memory.items():
+            btn_frame = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
+            btn_frame.pack(fill="x", pady=2)
+
+            lbl = ctk.CTkLabel(btn_frame, text=query, width=130, anchor="w")
+            lbl.pack(side="left", padx=5)
+
+            # Przycisk gwiazdki symuluje kliknięcie/wywołanie danej ścieżki
+            run_btn = ctk.CTkButton(btn_frame, text="★", width=30,
+                                    command=lambda q=query: self._run_from_memory(q))
+            run_btn.pack(side="right", padx=2)
+
+    def _run_from_memory(self, query: str):
+        """Uruchamia zadanie poleceniem wprost z bazy."""
+        self.input_entry.delete(0, "end")
+        self.input_entry.insert(0, query)
+        self.execute_action()
+
+    def _save_last_action(self):
+        """Zapisuje ostatnie poprawnie wygenerowane akcje do bazy (Złota Lista)."""
+        if self.last_query and self.last_actions:
+            self.knowledge_base.add_learned_action(self.last_query, self.last_actions)
+            self.log_message(f"[PAMIĘĆ]: Zapisano procedurę dla: '{self.last_query}'")
+            self._refresh_sidebar()
+
     def toggle_compact_mode(self):
         """Przełącza pomiędzy pełnym a kompaktowym rozmiarem okna."""
         if not self.is_compact:
@@ -168,11 +233,13 @@ class JarvisApp(ctk.CTk):
             self.is_compact = False
 
     def log_message(self, message: str):
-        """Dodaje nową wiadomość do obszaru logów."""
-        self.log_textbox.configure(state="normal")
-        self.log_textbox.insert("end", f"{message}\n")
-        self.log_textbox.configure(state="disabled")
-        self.log_textbox.see("end") # Przewiń do samego dołu
+        """Dodaje nową wiadomość do obszaru logów. Metoda ta jest thread-safe (używa self.after)."""
+        def _append_log():
+            self.log_textbox.configure(state="normal")
+            self.log_textbox.insert("end", f"{message}\n")
+            self.log_textbox.configure(state="disabled")
+            self.log_textbox.see("end") # Przewiń do samego dołu
+        self.after(0, _append_log)
 
     def execute_action(self):
         """Metoda wywoływana po kliknięciu przycisku Wykonaj."""
@@ -191,32 +258,114 @@ class JarvisApp(ctk.CTk):
         # Zablokowanie przycisku podczas wykonywania
         self.execute_button.configure(state="disabled")
 
+        # Sprawdzanie pamięci "Złotej Listy"
+        mem_actions = self.knowledge_base.get_action(user_input)
+        if mem_actions:
+            self.log_message("[JARVIS]: Używam zapamiętanej ścieżki.")
+            # Wykonanie natychmiastowe z wątkiem dla płynności GUI
+            threading.Thread(target=self._run_memory_thread, args=(mem_actions,), daemon=True).start()
+            return
+
         # Uruchomienie zadania w nowym wątku, aby nie blokować GUI
         threading.Thread(target=self._process_command, args=(user_input,), daemon=True).start()
 
-    def _process_command(self, user_input: str):
-        """Wątek zajmujący się logiką przetwarzania przy użyciu AI."""
+    def _run_memory_thread(self, actions):
+        """Wykonywanie akcji ze złotej listy poza wątkiem głównym."""
         try:
-            self.log_message("[JARVIS]: Pobieram obraz z głównego ekranu...")
-            screenshot = capture_screen()
+            self._execute_actions(actions)
+        finally:
+            self.execute_button.configure(state="normal")
 
-            self.log_message("[JARVIS]: Wysyłam zapytanie do modelu sztucznej inteligencji...")
-            response = self.brain.process_request(user_input, screenshot)
+    def _process_command(self, user_input: str):
+        """Wątek zajmujący się logiką przetwarzania przy użyciu AI z próbami (Autokorekta OCR) oraz "Wizją Selektywną" (ROI)."""
+        try:
+            target_window = ""
 
-            thought = response.get("thought", "Brak przemyśleń.")
-            actions = response.get("actions", [])
+            # Pętla autokorekty (max 2 próby)
+            for attempt in range(2):
 
-            self.log_message(f"[JARVIS MYŚLI]: {thought}")
+                # Mechanizm "Wizji Selektywnej"
+                screenshot = None
+                if target_window:
+                    self.log_message(f"[JARVIS] (Próba {attempt+1}/2): Pobieram wycinek z okna: '{target_window}'...")
+                    screenshot = capture_window_roi(target_window)
 
-            if not actions:
-                self.log_message("[JARVIS]: Nie znaleziono żadnych akcji do wykonania.")
-            else:
-                self._execute_actions(actions)
+                if not screenshot:
+                    self.log_message(f"[JARVIS] (Próba {attempt+1}/2): Pobieram obraz z całego głównego ekranu...")
+                    screenshot = capture_screen(scale_down=True)
+
+                self.log_message("[JARVIS]: Wysyłam zapytanie do modelu sztucznej inteligencji...")
+                response = self.brain.process_request(user_input, screenshot)
+
+                thought = response.get("thought", "Brak przemyśleń.")
+                plan = response.get("plan", [])
+                actions = response.get("actions", [])
+
+                # Zapisujemy zasugerowane przez AI docelowe okno dla kolejnych akcji (w tym autokorekty)
+                suggested_target = response.get("target_window", "")
+                if suggested_target:
+                    target_window = suggested_target
+
+                self.log_message(f"[JARVIS MYŚLI]: {thought}")
+                if plan:
+                    self.log_message(f"[JARVIS PLANUJE]: {', '.join(plan)}")
+
+                if not actions:
+                    self.log_message("[JARVIS]: Nie znaleziono żadnych akcji do wykonania.")
+                    break
+                else:
+                    # Wykonanie akcji
+                    self._execute_actions(actions)
+
+                    # Logika Autokorekty i Weryfikacji (OCR) po wykonaniu akcji
+                    has_error = False
+                    if attempt == 0:
+                        self.log_message("[JARVIS]: Weryfikuję rezultat zadania...")
+                        # Pobieramy nowy, wyostrzony ekran do lokalnego OCR by uniknąć zapytania sieciowego
+                        verification_screenshot = capture_screen(scale_down=False)
+
+                        # Definicja potencjalnych komunikatów świadczących o porażce/błędzie (OCR)
+                        error_keywords = ["błąd", "error", "nie znaleziono", "nie można", "nie udało się", "failed"]
+
+                        for kw in error_keywords:
+                            if is_text_visible(verification_screenshot, kw):
+                                self.log_message(f"[AUTOKOREKTA]: Wykryto tekst '{kw}' na ekranie po wykonaniu akcji. Próbuję innej ścieżki...")
+                                has_error = True
+                                break
+
+                        if has_error:
+                            # Przechodzimy do kolejnej iteracji pętli (attempt = 1) bez dodawania do pamięci.
+                            continue
+
+                        # Brak błędów na ekranie przy pierwszej próbie.
+                        self.log_message("[JARVIS]: Autokorekta nie wykryła błędów.")
+
+                    self.log_message("[JARVIS]: Zadanie wykonane.")
+                    self.last_query = user_input
+                    self.last_actions = actions
+                    # Gwiazdkę dodajemy do aktualnych zadań interfejsu
+                    self.after(0, self._add_last_action_to_panel)
+                    break
 
         except Exception as e:
             self.log_message(f"[BŁĄD WĄTKU]: {e}")
         finally:
-            self.execute_button.configure(state="normal")
+            self.after(0, lambda: self.execute_button.configure(state="normal"))
+
+    def _add_last_action_to_panel(self):
+        """Dodaje przycisk szybkiego zapisu ostatniego zapytania."""
+        self.log_message("[SYSTEM]: Możesz teraz zapisać tę komendę na stałe za pomocą przycisku [★ Zapisz Akcję].")
+        # Jeśli istnieje już przycisk zapisujący, zaktualizuj go, albo utwórz nowy w stopce
+        if not hasattr(self, 'save_action_button') or not self.save_action_button.winfo_exists():
+            self.save_action_button = ctk.CTkButton(
+                self.bottom_frame,
+                text="★ Zapisz Akcję",
+                fg_color="orange",
+                hover_color="darkorange",
+                command=self._save_last_action,
+                width=120
+            )
+            self.save_action_button.grid(row=0, column=3, padx=(0, 10), pady=10)
 
     def _execute_actions(self, actions: list):
         """Sekwencyjnie wykonuje zlecone przez silnik akcje."""
@@ -262,6 +411,14 @@ class JarvisApp(ctk.CTk):
                         self.log_message(f"[BŁĄD AKCJI]: Nie udało się uruchomić procesu - {e}")
                 else:
                     self.log_message(f"[JARVIS OSTRZEŻENIE]: Nie potrafię zlokalizować programu dla zapytania: '{query}'.")
+
+            elif action_type == "clipboard_write":
+                text = act.get("text", "")
+                self.log_message("[JARVIS AKCJA]: Kopiuję dane do schowka")
+                try:
+                    copy_to_clipboard(text)
+                except Exception as e:
+                    self.log_message(f"[BŁĄD AKCJI]: Nie udało się skopiować - {e}")
 
             else:
                 self.log_message(f"[OSTRZEŻENIE]: Nierozpoznana akcja: {act}")

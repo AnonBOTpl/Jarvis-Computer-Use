@@ -5,3 +5,6 @@ mss
 pillow
 rapidfuzz
 psutil
+pytesseract
+pygetwindow
+pyperclip

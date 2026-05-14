@@ -14,10 +14,12 @@ Projekt jest w fazie wczesnego rozwoju, zapewniając modułową architekturę do
 
 Projekt został podzielony na kilka głównych modułów:
 
-*   `gui/` - Graficzny interfejs użytkownika (CustomTkinter).
-*   `vision/` - Przechwytywanie i analiza obrazu z ekranu (mss, Pillow, Gemini).
-*   `controller/` - Sterowanie systemem, symulowanie wejścia z klawiatury i myszy (PyAutoGUI).
-*   `discovery/` - Funkcje wykrywania i uruchamiania aplikacji na komputerze użytkownika.
+*   `gui/` - Graficzny interfejs użytkownika, konfiguracja (CustomTkinter).
+*   `vision/` - Przechwytywanie (Wizja selektywna) i analiza obrazu z ekranu (mss, Pillow, Tesseract OCR).
+*   `controller/` - Sterowanie systemem, symulowanie wejścia z klawiatury, myszy i schowka systemowego (PyAutoGUI, pyperclip).
+*   `discovery/` - Funkcje wykrywania i uruchamiania aplikacji na komputerze użytkownika z logiką rozmytą (RapidFuzz).
+*   `ai_engine/` - Główny silnik (Mózg) wysyłający asynchroniczne żądania do Google Gemini.
+*   `memory/` - System pamięci lokalnej (Złota Lista) ograniczający koszty i przyspieszający typowe procesy.
 
 ## Instalacja i uruchamianie
 
@@ -31,8 +33,9 @@ Skrypt `run_jarvis.bat` spróbuje automatycznie:
 2.  Zainstalować języka Python za pomocą narzędzia `winget` (jeśli nie zostanie znaleziony w systemie).
     *   **Uwaga:** Automatyczna instalacja przez `winget` może wymagać potwierdzenia okna z prośbą o uprawnienia administratora (UAC).
 3.  Utworzyć izolowane wirtualne środowisko `.venv`.
-4.  Zainstalować wszystkie wymagane biblioteki, takie jak `google-genai`, `customtkinter`, `pyautogui`, `mss`, `pillow`, czy `rapidfuzz`.
-5.  Uruchomić główne okno aplikacji.
+4.  Zainstalować wymagane oprogramowanie OCR: `Tesseract` (automatycznie).
+5.  Zainstalować wszystkie wymagane biblioteki, takie jak `google-genai`, `customtkinter`, `pyautogui`, `mss`, `pillow`, `rapidfuzz`, `psutil`, `pygetwindow`, `pyperclip`, `pytesseract`.
+6.  Uruchomić główne okno aplikacji.
 
 Alternatywnie możesz ręcznie skonfigurować środowisko używając pliku `main.py` jako punktu wejścia.
 

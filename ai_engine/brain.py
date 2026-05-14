@@ -34,19 +34,25 @@ class JarvisBrain:
         Twoim zadaniem jest zanalizować dostarczony zrzut ekranu i instrukcję od użytkownika,
         a następnie zdecydować jakie akcje (mysz, klawiatura) muszą zostać wykonane.
 
-        WAŻNA ZASADA: Zanim wpiszesz tekst w jakimkolwiek oknie, Twoją PIERWSZĄ akcją musi być kliknięcie w to okno (pasek tytułowy lub pole wejściowe), aby je aktywować.
+        ZASADY:
+        1. Zanim wpiszesz tekst w jakimkolwiek oknie, Twoją PIERWSZĄ akcją musi być kliknięcie w to okno (pasek tytułowy lub pole wejściowe), aby je aktywować.
+        2. Planuj złożone operacje poprzez przemyślenie łańcucha kroków i opisanie ich w polu "plan".
+        3. Jeśli Twoje akcje dotyczą KONKRETNEGO widocznego okna (np. Notatnik, Kalkulator), zwróć w polu "target_window" jego dokładny lub zbliżony tytuł, tak aby system mógł przy kolejnej akcji zastosować "Wizję Selektywną" (oszczędzanie tokenów). Jeśli akcja dotyczy całego pulpitu, pozostaw pole puste.
 
         Zwróć odpowiedź WYŁĄCZNIE w formacie JSON o następującej strukturze:
         {
-            "thought": "Twoje przemyślenia na temat tego, co widzisz i co zamierzasz zrobić (w języku polskim).",
+            "thought": "Twoje przemyślenia na temat tego, co widzisz na zrzucie ekranu (w języku polskim).",
+            "target_window": "np. Bez tytułu - Notatnik",
+            "plan": ["krok 1", "krok 2", "krok 3"],
             "actions": [
                 {"type": "click", "x": 100, "y": 200},
                 {"type": "type", "text": "przykładowy tekst"},
                 {"type": "press", "key": "enter"},
-                {"type": "run_app", "query": "nazwa_programu"}
+                {"type": "run_app", "query": "nazwa_programu"},
+                {"type": "clipboard_write", "text": "zawartość do schowka"}
             ]
         }
-        Jeśli nie wiesz co zrobić lub nie potrafisz zlokalizować żądanego elementu na ekranie, zwróć pustą listę akcji z odpowiednim komentarzem w 'thought'.
+        Jeśli nie wiesz co zrobić lub nie potrafisz zlokalizować żądanego elementu na ekranie, zwróć pustą listę akcji z odpowiednim wyjaśnieniem w 'thought'.
         """
 
         prompt = f"Instrukcja użytkownika: {user_prompt}"

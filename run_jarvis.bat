@@ -54,6 +54,25 @@ if %errorlevel% neq 0 (
 set "PYTHON_CMD=py -3.12"
 
 :setup_venv
+
+echo.
+echo Sprawdzanie instalacji Tesseract-OCR...
+where tesseract >nul 2>&1
+if %errorlevel% neq 0 (
+    if not exist "C:\Program Files\Tesseract-OCR\tesseract.exe" (
+        echo Nie znaleziono Tesseract-OCR. Próba automatycznej instalacji...
+        winget install -e --id UB-Mannheim.TesseractOCR
+        if %errorlevel% neq 0 (
+            echo Instalacja Tesseract-OCR nie powiodla sie. OCR moie nie dzialac poprawnie.
+        ) else (
+            echo Tesseract-OCR zostal zainstalowany.
+        )
+    ) else (
+        echo Znalaziono Tesseract w domyslnej sciezce Program Files.
+    )
+) else (
+    echo Tesseract-OCR jest dostepny w zmiennej PATH.
+)
 echo.
 echo ========================================================
 echo Tworzenie środowiska wirtualnego .venv...
