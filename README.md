@@ -14,12 +14,13 @@ Projekt jest w fazie wczesnego rozwoju, zapewniając modułową architekturę do
 
 Projekt został podzielony na kilka głównych modułów:
 
-*   `gui/` - Graficzny interfejs użytkownika, konfiguracja (CustomTkinter).
+*   `gui/` - Graficzny interfejs użytkownika, konfiguracja, terminal zdarzeń i weryfikacja kodu (CustomTkinter).
 *   `vision/` - Przechwytywanie (Wizja selektywna) i analiza obrazu z ekranu (mss, Pillow, Tesseract OCR).
 *   `controller/` - Sterowanie systemem, symulowanie wejścia z klawiatury, myszy i schowka systemowego (PyAutoGUI, pyperclip).
 *   `discovery/` - Funkcje wykrywania i uruchamiania aplikacji na komputerze użytkownika z logiką rozmytą (RapidFuzz).
-*   `ai_engine/` - Główny silnik (Mózg) wysyłający asynchroniczne żądania do Google Gemini.
+*   `ai_engine/` - Główny silnik (Mózg) wysyłający asynchroniczne żądania do Google Gemini. Preferujący tryb Code Interpretera w celu oszczędności punktów wizji.
 *   `memory/` - System pamięci lokalnej (Złota Lista) ograniczający koszty i przyspieszający typowe procesy.
+*   `executor/` - Silnik deweloperski interpretujący wygenerowane kody w logice izolowanej z asynchronicznym wczytywaniem zdarzeń.
 
 ## Instalacja i uruchamianie
 

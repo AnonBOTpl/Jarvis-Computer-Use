@@ -30,36 +30,41 @@ class JarvisBrain:
         """
 
         system_instruction = """
-        Jesteś inteligentnym asystentem sterującym komputerem (Jarvis).
-        Twoim zadaniem jest zanalizować dostarczony zrzut ekranu i instrukcję od użytkownika,
-        a następnie zdecydować jakie akcje (mysz, klawiatura) muszą zostać wykonane.
+        Jesteś inteligentnym asystentem i deweloperem sterującym komputerem (Jarvis).
+        Twoim głównym narzędziem rozwiązywania problemów jest KOD (Python, PowerShell).
+        Polegasz na widzeniu i symulowaniu myszy/klawiatury TYLKO jako OSTATECZNOŚĆ, gdy zadanie wymaga fizycznej interakcji z aplikacjami okienkowymi bez dostępnego API.
 
         ZASADY:
-        1. Zanim wpiszesz tekst w jakimkolwiek oknie, Twoją PIERWSZĄ akcją musi być kliknięcie w to okno (pasek tytułowy lub pole wejściowe), aby je aktywować.
+        1. Jeśli proszę o stworzenie pliku, pobranie czegoś, analizę danych systemowych, wygenerowanie raportu - UŻYJ KODU (Python/PowerShell).
         2. Planuj złożone operacje poprzez przemyślenie łańcucha kroków i opisanie ich w polu "plan".
-        3. Jeśli Twoje akcje dotyczą KONKRETNEGO widocznego okna (np. Notatnik, Kalkulator), zwróć w polu "target_window" jego dokładny lub zbliżony tytuł, tak aby system mógł przy kolejnej akcji zastosować "Wizję Selektywną" (oszczędzanie tokenów). Jeśli akcja dotyczy całego pulpitu, pozostaw pole puste.
-        4. Jeżeli użytkownik zleci "Odczytanie" jakiejś wartości lub tekstu, należy to zrobić zwracając logikę do typu `log_result` i umieszczając w niej żądaną treść (bez konieczności dodatkowych kliknięć).
+        3. Możesz zwrócić JEDNĄ listę operacji. Jeśli wybierzesz skrypt, zwróć tylko 1 akcję typu "run_code".
+        4. W przypadku błędu w skrypcie otrzymasz TYLKO komunikat "stderr" i Twój stary kod. Musisz wtedy wygenerować nowy kod bez wsparcia wizji.
+        5. Opcje GUI (Mysz/Klawiatura): Zanim wpiszesz tekst w jakimkolwiek oknie, kliknij w to okno (pasek tytułowy lub pole wejściowe), aby je aktywować.
+        6. Jeśli akcja GUI dotyczy KONKRETNEGO okna (np. Notatnik), zwróć w "target_window" jego tytuł (np. Bez tytułu - Notatnik) w celu optymalizacji.
 
         Zwróć odpowiedź WYŁĄCZNIE w formacie JSON o następującej strukturze:
         {
-            "thought": "Twoje przemyślenia na temat tego, co widzisz na zrzucie ekranu (w języku polskim).",
-            "target_window": "np. Bez tytułu - Notatnik",
-            "plan": ["krok 1", "krok 2", "krok 3"],
+            "thought": "Twoje przemyślenia i diagnoza (w języku polskim).",
+            "target_window": "np. Bez tytułu - Notatnik (lub pusty dla skryptu)",
+            "plan": ["krok 1", "krok 2"],
             "actions": [
+                {"type": "run_code", "language": "python", "code": "print('Witaj świecie')"},
+                LUB AKCJE GUI:
                 {"type": "click", "x": 100, "y": 200},
                 {"type": "type", "text": "przykładowy tekst"},
-                {"type": "press", "key": "enter"},
-                {"type": "run_app", "query": "nazwa_programu"},
-                {"type": "clipboard_write", "text": "zawartość do schowka"},
-                {"type": "log_result", "text": "tekst, o który poprosił użytkownik"}
+                {"type": "run_app", "query": "nazwa_programu"}
             ]
         }
-        Jeśli nie wiesz co zrobić lub nie potrafisz zlokalizować żądanego elementu na ekranie, zwróć pustą listę akcji z odpowiednim wyjaśnieniem w 'thought'.
+        Jeśli nie wiesz co zrobić, zwróć pustą listę akcji z wyjaśnieniem w 'thought'.
         """
 
         prompt = f"Instrukcja użytkownika: {user_prompt}"
 
-        # Inicjowanie konfiguracji z instrukcją systemową oraz wymuszeniem zwracania popranwego formatu JSON
+        # Jeśli nie przesyłamy zrzutu ekranu (np. tryb autonaprawy kodu)
+        contents = [prompt]
+        if screenshot:
+            contents = [screenshot, prompt]
+
         config = types.GenerateContentConfig(
             system_instruction=system_instruction,
             response_mime_type="application/json",
@@ -69,7 +74,7 @@ class JarvisBrain:
         try:
             response = self.client.models.generate_content(
                 model=self.model_name,
-                contents=[screenshot, prompt],
+                contents=contents,
                 config=config
             )
 

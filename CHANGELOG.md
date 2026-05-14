@@ -2,6 +2,14 @@
 
 Wszystkie istotne zmiany w tym projekcie będą dokumentowane w tym pliku.
 
+## [Wersja 2.0.0] - Code Interpreter: Architektura zaawansowanego programisty systemowego
+*   Jarvis odchodzi od prymitywnego symulowania kliknięć. Algorytm w głównej mierze analizuje teraz żądania, starając się przełożyć je na wysokopoziomowe skrypty **Python** lub **PowerShell**.
+*   **Silnik wykonawczy (Executor):** Dodano potężne, odizolowane środowisko zdolne do interpretowania poleceń dostarczonych przez silnik.
+*   **Terminal interaktywny:** GUI zostało rozbudowane o moduł czytania logów (stdout i stderr) w czasie rzeczywistym z rozbiciem na kolorową identyfikację dzięki tagom.
+*   **Podgląd Skryptu:** Dodano rozwijaną zakładkę pozwalającą na inspekcję wygenerowanego przez sztuczną inteligencję kodu wraz z asystą w jego ewentualnej poprawie.
+*   **Oszczędność czasu i kosztów AI:** Model w pierwszej kolejności korzysta z wywołań skryptów, drastycznie zmniejszając zależność od przesyłania wysoce wymagających obrazów przez rzuty ekranu API. Aby odzwierciedlić korzyści z tej potężnej aktualizacji nałożono zintegrowany licznik pominieć zdjęć na okno interfejsu.
+*   **Pętla autonaprawy:** Gdy włączony do pracy algorytm zostanie zastopowany błędem lub uszkodzeniem, Jarvis otrzyma wycinek problematycznego kodu z prośbą o rewizję za ułamek ceny odpytania głównego trybu interfejsu, zapewniając 100% płynności działania.
+
 ## [Wersja 1.0.1] - Krytyczne poprawki stabilności i wizji "Top-Tier"
 *   Wprowadzono 2-sekundowy timeout dla silnika `Tesseract`, zapobiegając zamarzaniu procesu weryfikacji na wolniejszych komputerach.
 *   Rozwiązano problem ze złą kalibracją kliknięć wywołanych użyciem "Wizji Selektywnej". Kliknięcia są teraz poprawnie przeliczane według globalnych współrzędnych systemu zamiast kordynatów uciętego okna.
