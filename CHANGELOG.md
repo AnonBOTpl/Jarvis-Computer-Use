@@ -2,6 +2,12 @@
 
 Wszystkie istotne zmiany w tym projekcie będą dokumentowane w tym pliku.
 
+## [Wersja 2.0.1] - Optymalizacja UX oraz Tokenizacji Modelu (UX/UI Fixes)
+*   Usunięto tryb kompaktowy, stawiając na estetykę interfejsu powiązaną ściśle z terminalem tekstowym. Dodatkowo dynamicznie przypisano reagowanie klawisza "Enter" z poziomu okna do metody uruchamiającej wprowadzony algorytm.
+*   Wymieniono system mierzenia rzutów ekranu z pominięć, na konkretny ułamek odwołujący się do zliczania "in" oraz "out" (Prompt / Tokens count) tokenów przy użyciu flag `usage_metadata` z najnowszego modułu pakietu `google-genai`.
+*   System domyślnie korzysta z tańszego zapytania tekstowego na starcie konwersacji, pobierając ekran w postaci rzutów lub wizji selektywnej tylko i wyłącznie wtedy kiedy poprosi o to sam model asystenta (Nowa akcja `request_vision`).
+*   System zapisuje poprawnie wykonane skrypty do specjalnego katalogu autozapisów (`scripts/auto_saved`) odciążając pamięć w plikach historii.
+
 ## [Wersja 2.0.0] - Code Interpreter: Architektura zaawansowanego programisty systemowego
 *   Jarvis odchodzi od prymitywnego symulowania kliknięć. Algorytm w głównej mierze analizuje teraz żądania, starając się przełożyć je na wysokopoziomowe skrypty **Python** lub **PowerShell**.
 *   **Silnik wykonawczy (Executor):** Dodano potężne, odizolowane środowisko zdolne do interpretowania poleceń dostarczonych przez silnik.

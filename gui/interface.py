@@ -49,15 +49,16 @@ class JarvisApp(ctk.CTk):
         )
         self.status_label.grid(row=0, column=0, padx=10, pady=(10, 5), sticky="w")
 
-        # Licznik oszczędności (screenshotów pominętych dzięki skryptom)
-        self.saved_screenshots_count = 0
-        self.savings_label = ctk.CTkLabel(
+        # Statystyki użycia tokenów
+        self.tokens_in = 0
+        self.tokens_out = 0
+        self.tokens_label = ctk.CTkLabel(
             self.top_bar_frame,
-            text="Zaoszczędzone Screenshoty: 0",
+            text="Tokeny (In/Out): 0 / 0",
             font=ctk.CTkFont(size=12, slant="italic"),
             text_color="orange"
         )
-        self.savings_label.grid(row=0, column=1, padx=(10, 20), pady=(10, 5), sticky="w")
+        self.tokens_label.grid(row=0, column=1, padx=(10, 20), pady=(10, 5), sticky="w")
 
         self.stats_label = ctk.CTkLabel(
             self.top_bar_frame,
@@ -66,15 +67,6 @@ class JarvisApp(ctk.CTk):
         )
         self.stats_label.grid(row=0, column=2, padx=10, pady=(10, 5), sticky="e")
 
-        # Przycisk trybu kompaktowego w prawym górnym rogu
-        self.compact_button = ctk.CTkButton(
-            self.top_bar_frame,
-            text="Tryb Kompaktowy",
-            command=self.toggle_compact_mode,
-            width=120
-        )
-        self.compact_button.grid(row=0, column=3, padx=10, pady=(10, 5), sticky="e")
-
         # Przycisk Ustawienia
         self.settings_button = ctk.CTkButton(
             self.top_bar_frame,
@@ -82,7 +74,7 @@ class JarvisApp(ctk.CTk):
             command=self.open_settings,
             width=100
         )
-        self.settings_button.grid(row=0, column=4, padx=(0, 10), pady=(10, 5), sticky="e")
+        self.settings_button.grid(row=0, column=3, padx=(0, 10), pady=(10, 5), sticky="e")
 
         # Przycisk Bocznego Panelu "Ostatnie Akcje"
         self.sidebar_button = ctk.CTkButton(
@@ -91,7 +83,7 @@ class JarvisApp(ctk.CTk):
             command=self.toggle_sidebar,
             width=120
         )
-        self.sidebar_button.grid(row=0, column=5, padx=(0, 10), pady=(10, 5), sticky="e")
+        self.sidebar_button.grid(row=0, column=4, padx=(0, 10), pady=(10, 5), sticky="e")
 
         # --- Podgląd Skryptu (Rozwijany / Chowany przed główną ramką) ---
         self.script_preview_frame = ctk.CTkFrame(self.main_frame)
@@ -152,6 +144,9 @@ class JarvisApp(ctk.CTk):
         )
         self.input_entry.grid(row=0, column=0, padx=(0, 10), pady=10, sticky="ew")
 
+        # Bindowanie entera do akcji
+        self.input_entry.bind("<Return>", lambda event: self.execute_action())
+
         # Przycisk "Wykonaj"
         self.execute_button = ctk.CTkButton(
             self.bottom_frame,
@@ -168,7 +163,8 @@ class JarvisApp(ctk.CTk):
             fg_color="red",
             hover_color="darkred",
             command=self.stop_action,
-            width=100
+            width=100,
+            state="disabled"
         )
         self.stop_button.grid(row=0, column=2, padx=0, pady=10)
 
@@ -263,21 +259,6 @@ class JarvisApp(ctk.CTk):
             self.log_message(f"[PAMIĘĆ]: Zapisano procedurę dla: '{self.last_query}'")
             self._refresh_sidebar()
 
-    def toggle_compact_mode(self):
-        """Przełącza pomiędzy pełnym a kompaktowym rozmiarem okna."""
-        if not self.is_compact:
-            # Włączenie trybu kompaktowego
-            self.geometry("400x300")
-            self.attributes("-topmost", True)  # Zawsze na wierzchu
-            self.compact_button.configure(text="Tryb Pełny")
-            self.is_compact = True
-        else:
-            # Powrót do trybu normalnego
-            self.geometry("800x600")
-            self.attributes("-topmost", False) # Anulowanie zawsze na wierzchu
-            self.compact_button.configure(text="Tryb Kompaktowy")
-            self.is_compact = False
-
     def log_message(self, message: str, tag: str = None):
         """Dodaje nową wiadomość do obszaru logów z opcjonalnym kolorem. Metoda ta jest thread-safe."""
         def _append_log():
@@ -298,15 +279,21 @@ class JarvisApp(ctk.CTk):
 
     def _handle_script_finished(self, return_code: int, stderr_str: str):
         self.log_message(f"[SYSTEM]: Skrypt zakończył pracę z kodem {return_code}.", "yellow")
-        self.after(0, lambda: self.execute_button.configure(state="normal"))
 
-        # Ocenienie błędu wykonania na poziomie agenta
-        if return_code != 0 and self.pending_script_action:
+        if return_code == 0 and self.pending_script_action:
+            # Automatyczny zapis po poprawnym wykonaniu
+            self._auto_save_script()
+            self.after(0, lambda: self.execute_button.configure(state="normal"))
+            self.after(0, lambda: self.stop_button.configure(state="disabled"))
+        elif return_code != 0 and self.pending_script_action:
+            # Ocenienie błędu wykonania na poziomie agenta
             self.log_message("[JARVIS]: Przechwytuję błąd, próbuję go naprawić bez użycia wizji...", "blue")
-            self._increment_savings()
             # Uruchomienie próby autonaprawy w nowym wątku (załączając stderr do promptu!)
             code = self.pending_script_action.get('code')
             threading.Thread(target=self._process_repair_loop, args=(code, stderr_str), daemon=True).start()
+        else:
+            self.after(0, lambda: self.execute_button.configure(state="normal"))
+            self.after(0, lambda: self.stop_button.configure(state="disabled"))
 
     def execute_action(self):
         """Metoda wywoływana po kliknięciu przycisku Wykonaj."""
@@ -322,8 +309,9 @@ class JarvisApp(ctk.CTk):
         self.log_message(f"[UŻYTKOWNIK]: {user_input}")
         self.input_entry.delete(0, "end")
 
-        # Zablokowanie przycisku podczas wykonywania
+        # Zablokowanie przycisku wykonaj i udostępnienie przycisku stop podczas wykonywania asynchronicznego polecenia
         self.execute_button.configure(state="disabled")
+        self.stop_button.configure(state="normal")
 
         # Sprawdzanie pamięci "Złotej Listy"
         mem_actions = self.knowledge_base.get_action(user_input)
@@ -344,28 +332,33 @@ class JarvisApp(ctk.CTk):
             self.execute_button.configure(state="normal")
 
     def _process_command(self, user_input: str):
-        """Wątek zajmujący się logiką przetwarzania przy użyciu AI z próbami (Autokorekta OCR) oraz "Wizją Selektywną" (ROI)."""
+        """Wątek zajmujący się logiką przetwarzania przy użyciu AI z próbami (Autokorekta OCR), "Wizją Selektywną" oraz minimalizacją pobierania okien dla zapytań skryptowych."""
         try:
             target_window = ""
             global_offset_x = 0
             global_offset_y = 0
+            use_vision_this_turn = False
 
             # Pętla autokorekty (max 2 próby)
             for attempt in range(2):
 
-                # Mechanizm "Wizji Selektywnej"
                 screenshot = None
-                if target_window:
-                    self.log_message(f"[JARVIS] (Próba {attempt+1}/2): Pobieram wycinek z okna: '{target_window}'...")
-                    screenshot, global_offset_x, global_offset_y = capture_window_roi(target_window)
+                if use_vision_this_turn:
+                    # Mechanizm "Wizji Selektywnej"
+                    if target_window:
+                        self.log_message(f"[JARVIS] (Próba {attempt+1}/2): Pobieram wycinek z okna: '{target_window}'...")
+                        screenshot, global_offset_x, global_offset_y = capture_window_roi(target_window)
 
-                if not screenshot:
-                    self.log_message(f"[JARVIS] (Próba {attempt+1}/2): Pobieram obraz z całego głównego ekranu...")
-                    screenshot = capture_screen(scale_down=True)
-                    global_offset_x, global_offset_y = 0, 0
+                    if not screenshot:
+                        self.log_message(f"[JARVIS] (Próba {attempt+1}/2): Pobieram obraz z całego głównego ekranu...")
+                        screenshot = capture_screen(scale_down=True)
+                        global_offset_x, global_offset_y = 0, 0
 
                 self.log_message("[JARVIS]: Wysyłam zapytanie do modelu sztucznej inteligencji...")
                 response = self.brain.process_request(user_input, screenshot)
+
+                # Zliczanie zużycia tokenów przy głównym zapytaniu API
+                self._update_tokens(response.get("usage_metadata"))
 
                 thought = response.get("thought", "Brak przemyśleń.")
                 plan = response.get("plan", [])
@@ -384,13 +377,21 @@ class JarvisApp(ctk.CTk):
                     self.log_message("[JARVIS]: Nie znaleziono żadnych akcji do wykonania.")
                     break
 
-                # PRZECHWYCENIE AKCJI KODU ZAMIAST GUI
+                # 1. Obsługa wygenerowanego kodu
                 if len(actions) == 1 and actions[0].get("type") in ["run_code"]:
                     self.pending_script_action = actions[0]
-                    self._increment_savings()
                     self.after(0, self._show_script_preview)
                     # Zatrzymujemy pętle wywoławczą po przekierowaniu odpowiedzialności na widok okna kodu
                     return
+
+                # 2. Obsługa dobrowolnego żądania agenta do odblokowania widoku ekranu
+                elif len(actions) == 1 and actions[0].get("type") == "request_vision":
+                    self.log_message(f"[JARVIS OSTRZEŻENIE]: {actions[0].get('reason', 'Potrzebuję sprawdzić wizję ekranu.')}")
+                    use_vision_this_turn = True
+                    # Pobiera vision w drugiej petli dzieki `continue`
+                    continue
+
+                # 3. Obsługa wyjścia interaktywnego dla pulpitu
                 else:
                     # Wykonanie standardowych akcji GUI
                     self._execute_actions(actions, global_offset_x, global_offset_y)
@@ -460,6 +461,13 @@ class JarvisApp(ctk.CTk):
             )
             self.save_action_button.grid(row=0, column=3, padx=(0, 10), pady=10)
 
+    def _update_tokens(self, usage: dict):
+        """Aktualizuje etykietę zużycia tokenów na interfejsie."""
+        if usage:
+            self.tokens_in += usage.get("prompt_token_count", 0)
+            self.tokens_out += usage.get("candidates_token_count", 0)
+            self.after(0, lambda: self.tokens_label.configure(text=f"Tokeny (In/Out): {self.tokens_in} / {self.tokens_out}"))
+
     def _process_repair_loop(self, failed_code: str, stderr_str: str):
         """Mechanizm wysyłający błędny kod (bez wizji) na naprawę."""
         repair_prompt = (
@@ -472,6 +480,8 @@ class JarvisApp(ctk.CTk):
 
         try:
             response = self.brain.process_request(repair_prompt, screenshot=None)
+            self._update_tokens(response.get("usage_metadata"))
+
             actions = response.get("actions", [])
 
             if len(actions) == 1 and actions[0].get("type") == "run_code":
@@ -551,6 +561,7 @@ class JarvisApp(ctk.CTk):
         lang = self.pending_script_action.get("language", "python").lower()
 
         self.log_message("[SYSTEM]: Uruchamiam skrypt w zaufanym środowisku...", "yellow")
+        self.stop_button.configure(state="normal")
 
         if lang == "python":
             self.script_runner.run_python_code(code)
@@ -559,6 +570,7 @@ class JarvisApp(ctk.CTk):
         else:
             self.log_message(f"[BŁĄD]: Nieobsługiwany język skryptowy: {lang}", "red")
             self.execute_button.configure(state="normal")
+            self.stop_button.configure(state="disabled")
 
     def _reject_script(self):
         """Wykonywane po naciśnięciu Odrzuć pod podglądem kodu."""
@@ -566,11 +578,29 @@ class JarvisApp(ctk.CTk):
         self.pending_script_action = None
         self.log_message("[SYSTEM]: Anulowano wykonanie kodu.", "red")
         self.execute_button.configure(state="normal")
+        self.stop_button.configure(state="disabled")
 
-    def _increment_savings(self):
-        """Dodaje jedynkę do statystyk licznika optymalizacji zrzutów."""
-        self.saved_screenshots_count += 1
-        self.after(0, lambda: self.savings_label.configure(text=f"Zaoszczędzone Screenshoty: {self.saved_screenshots_count}"))
+    def _auto_save_script(self):
+        """Automatycznie zapisuje działający skrypt do folderu scripts/auto_saved."""
+        import time
+
+        if not self.pending_script_action: return
+        code = self.pending_script_action.get("code", "")
+        lang = self.pending_script_action.get("language", "python").lower()
+        ext = ".py" if lang == "python" else ".ps1"
+
+        save_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts", "auto_saved")
+        os.makedirs(save_dir, exist_ok=True)
+
+        timestamp = int(time.time())
+        filepath = os.path.join(save_dir, f"script_{timestamp}{ext}")
+
+        try:
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(code)
+            self.log_message(f"[SYSTEM]: Skrypt zarchiwizowano w: {filepath}", "green")
+        except Exception as e:
+            self.log_message(f"[BŁĄD ZAPISU]: Nie udało się zachować historii skryptu - {e}", "red")
 
     def _execute_actions(self, actions: list, offset_x: int = 0, offset_y: int = 0):
         """Sekwencyjnie wykonuje zlecone przez silnik akcje, uwzględniając offset "Wizji Selektywnej" (ROI)."""
