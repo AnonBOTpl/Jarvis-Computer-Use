@@ -8,6 +8,16 @@ class AppScanner:
 
     def __init__(self):
         self.known_apps = {}
+        self.synonyms = {
+            "notatnik": "notepad",
+            "kalkulator": "calc",
+            "przeglądarka": "chrome",
+            "cmd": "cmd",
+            "wiersz poleceń": "cmd",
+            "powershell": "powershell",
+            "wordpad": "wordpad",
+            "paint": "mspaint"
+        }
         self.refresh_apps()
 
     def refresh_apps(self):
@@ -62,17 +72,22 @@ class AppScanner:
             except FileNotFoundError:
                 continue
 
-    def find_app(self, query_name: str) -> str:
+    def find_app(self, query_name: str):
         """
         Wyszukuje pożądaną aplikację na podstawie nazwy, używając:
-        1. Narzędzia 'shutil.which' (sprawdzanie w zmiennych PATH środowiska).
-        2. RapidFuzz do dopasowania względem 'known_apps'.
+        1. Słownika synonimów.
+        2. Narzędzia 'shutil.which' (sprawdzanie w zmiennych PATH środowiska).
+        3. RapidFuzz do dopasowania względem 'known_apps'.
 
         Zwraca:
-            Pełną ścieżkę do programu, AppID (do użytku jako shell komenda)
-            lub po prostu oryginalne query w przypadku nieznalezienia.
+            Pełną ścieżkę do programu (plik .exe), czystą komendę systemową
+            albo None, jeśli aplikacja nie została znaleziona.
         """
         query_lower = query_name.lower().strip()
+
+        # 0. Zamiana na synonim, jeśli istnieje
+        if query_lower in self.synonyms:
+            query_lower = self.synonyms[query_lower]
 
         # 1. Sprawdzenie czy aplikacja znajduje się w zmiennej PATH (np. 'notepad', 'calc')
         path_result = shutil.which(query_lower)
@@ -93,6 +108,12 @@ class AppScanner:
                 best_match, score, index = result
                 # Przyjęto minimalny próg pewności (np. 70%)
                 if score >= 70:
-                    return self.known_apps[best_match]
+                    match_path = self.known_apps[best_match]
+                    # Często Get-StartApps zwraca ścieżki formatu AUMID, nie stricte .exe.
+                    # Fallback dla winreg zawsze zwraca absolutne ścieżki.
+                    if "!" in match_path or match_path.startswith("search:query="):
+                        # Nie możemy po prostu uruchomić search:query= przez Popen, zwracamy None w takim wypadku by nie powodować błędu.
+                        return None
+                    return match_path
 
-        return query_name # Jeżeli nie zdołano znaleźć pasującej ścieżki, zwraca domyślne hasło
+        return None

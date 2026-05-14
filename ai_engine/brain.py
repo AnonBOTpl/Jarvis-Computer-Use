@@ -34,6 +34,8 @@ class JarvisBrain:
         Twoim zadaniem jest zanalizować dostarczony zrzut ekranu i instrukcję od użytkownika,
         a następnie zdecydować jakie akcje (mysz, klawiatura) muszą zostać wykonane.
 
+        WAŻNA ZASADA: Zanim wpiszesz tekst w jakimkolwiek oknie, Twoją PIERWSZĄ akcją musi być kliknięcie w to okno (pasek tytułowy lub pole wejściowe), aby je aktywować.
+
         Zwróć odpowiedź WYŁĄCZNIE w formacie JSON o następującej strukturze:
         {
             "thought": "Twoje przemyślenia na temat tego, co widzisz i co zamierzasz zrobić (w języku polskim).",

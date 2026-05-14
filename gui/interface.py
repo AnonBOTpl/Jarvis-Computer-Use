@@ -250,19 +250,18 @@ class JarvisApp(ctk.CTk):
 
             elif action_type == "run_app":
                 query = act.get("query", "")
-                self.log_message(f"[JARVIS AKCJA]: Uruchamiam aplikację: '{query}'")
+                self.log_message(f"[JARVIS AKCJA]: Szukam aplikacji: '{query}'")
                 app_path = self.app_scanner.find_app(query)
 
-                try:
-                    # Próba otwarcia zaistniałego pliku
-                    if os.path.exists(app_path):
+                if app_path:
+                    try:
+                        self.log_message(f"[JARVIS AKCJA]: Uruchamiam zlokalizowaną ścieżkę: '{app_path}'")
+                        # Używamy Popen bez shell=True dla bezpieczeństwa, jeśli to jawna ścieżka.
                         subprocess.Popen(app_path)
-                    else:
-                        # Może być to nazwa znana w PATH lub alias shella
-                        # Używamy shell=True, jako rozwiązanie uniwersalne
-                        subprocess.Popen(app_path, shell=True)
-                except Exception as e:
-                    self.log_message(f"[BŁĄD AKCJI]: Nie można uruchomić aplikacji - {e}")
+                    except Exception as e:
+                        self.log_message(f"[BŁĄD AKCJI]: Nie udało się uruchomić procesu - {e}")
+                else:
+                    self.log_message(f"[JARVIS OSTRZEŻENIE]: Nie potrafię zlokalizować programu dla zapytania: '{query}'.")
 
             else:
                 self.log_message(f"[OSTRZEŻENIE]: Nierozpoznana akcja: {act}")
