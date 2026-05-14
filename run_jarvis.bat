@@ -88,8 +88,8 @@ if not exist "%VENV_PYTHON%" (
 "%VENV_PYTHON%" -m pip install --upgrade pip
 
 :: Instalacja zaleznosci
-echo Instalowanie wymaganych pakietów...
-"%VENV_PYTHON%" -m pip install google-genai customtkinter pyautogui mss pillow rapidfuzz
+echo Instalowanie wymaganych pakietów z pliku requirements.txt...
+"%VENV_PYTHON%" -m pip install -r requirements.txt
 
 if %errorlevel% neq 0 (
     echo Wystapil blad podczas instalacji zaleznosci.

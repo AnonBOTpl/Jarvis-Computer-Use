@@ -1,0 +1,7 @@
+google-genai
+customtkinter
+pyautogui
+mss
+pillow
+rapidfuzz
+psutil
