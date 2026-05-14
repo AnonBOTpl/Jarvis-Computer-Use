@@ -1,5 +1,13 @@
 import customtkinter as ctk
 import psutil
+import threading
+import os
+import subprocess
+from gui.settings import SettingsWindow, load_config
+from vision.screen_capture import capture_screen
+from controller.actions import click_at, type_text, press_key
+from discovery.app_scanner import AppScanner
+from ai_engine.brain import JarvisBrain
 
 class JarvisApp(ctk.CTk):
     """Główne okno aplikacji Jarvis - Agent AI."""
@@ -54,6 +62,15 @@ class JarvisApp(ctk.CTk):
         )
         self.compact_button.grid(row=0, column=2, padx=10, pady=(10, 5), sticky="e")
 
+        # Przycisk Ustawienia
+        self.settings_button = ctk.CTkButton(
+            self.top_bar_frame,
+            text="Ustawienia",
+            command=self.open_settings,
+            width=100
+        )
+        self.settings_button.grid(row=0, column=3, padx=(0, 10), pady=(10, 5), sticky="e")
+
         # 2. Obszar logów akcji (pole tekstowe z przewijaniem)
         self.log_textbox = ctk.CTkTextbox(
             self.main_frame,
@@ -101,6 +118,23 @@ class JarvisApp(ctk.CTk):
         # Uruchomienie cyklicznego odświeżania statystyk
         self.update_system_stats()
 
+        # Inicjalizacja modułów Jarvis
+        self.app_scanner = AppScanner()
+        self.brain = None
+        self._init_brain()
+
+    def _init_brain(self):
+        """Próbuje zainicjalizować moduł JarvisBrain na podstawie konfiguracji."""
+        config = load_config()
+        if config.get("api_key"):
+            try:
+                self.brain = JarvisBrain(config)
+                self.log_message("[SYSTEM]: Silnik AI pomyślnie załadowany.")
+            except Exception as e:
+                self.log_message(f"[BŁĄD]: Błąd inicjalizacji silnika AI: {e}")
+        else:
+            self.log_message("[SYSTEM]: Ostrzeżenie - Brak klucza API. Przejdź do 'Ustawienia', aby skonfigurować aplikację.")
+
     def update_system_stats(self):
         """Pobiera i aktualizuje statystyki CPU i RAM."""
         cpu_usage = psutil.cpu_percent()
@@ -108,6 +142,15 @@ class JarvisApp(ctk.CTk):
         self.stats_label.configure(text=f"CPU: {cpu_usage}% | RAM: {ram_usage}%")
         # Wywołuj tę samą funkcję co 2000 ms (2 sekundy)
         self.after(2000, self.update_system_stats)
+
+    def open_settings(self):
+        """Otwiera okno z ustawieniami aplikacji."""
+        SettingsWindow(self, on_save_callback=self.on_settings_saved)
+
+    def on_settings_saved(self):
+        """Callback po zapisaniu ustawień."""
+        self.log_message("[SYSTEM]: Ustawienia zostały zaktualizowane.")
+        self._init_brain()
 
     def toggle_compact_mode(self):
         """Przełącza pomiędzy pełnym a kompaktowym rozmiarem okna."""
@@ -133,13 +176,96 @@ class JarvisApp(ctk.CTk):
 
     def execute_action(self):
         """Metoda wywoływana po kliknięciu przycisku Wykonaj."""
-        user_input = self.input_entry.get()
-        if user_input:
-            self.log_message(f"[UŻYTKOWNIK]: {user_input}")
-            self.log_message("[JARVIS]: Przetwarzam zapytanie... (Funkcjonalność w przygotowaniu)")
-            self.input_entry.delete(0, "end")
-        else:
+        user_input = self.input_entry.get().strip()
+        if not user_input:
             self.log_message("[SYSTEM]: Proszę wpisać komendę przed wykonaniem.")
+            return
+
+        if not self.brain:
+            self.log_message("[BŁĄD]: Silnik AI nie jest gotowy. Uzupełnij klucz API w ustawieniach.")
+            return
+
+        self.log_message(f"[UŻYTKOWNIK]: {user_input}")
+        self.input_entry.delete(0, "end")
+
+        # Zablokowanie przycisku podczas wykonywania
+        self.execute_button.configure(state="disabled")
+
+        # Uruchomienie zadania w nowym wątku, aby nie blokować GUI
+        threading.Thread(target=self._process_command, args=(user_input,), daemon=True).start()
+
+    def _process_command(self, user_input: str):
+        """Wątek zajmujący się logiką przetwarzania przy użyciu AI."""
+        try:
+            self.log_message("[JARVIS]: Pobieram obraz z głównego ekranu...")
+            screenshot = capture_screen()
+
+            self.log_message("[JARVIS]: Wysyłam zapytanie do modelu sztucznej inteligencji...")
+            response = self.brain.process_request(user_input, screenshot)
+
+            thought = response.get("thought", "Brak przemyśleń.")
+            actions = response.get("actions", [])
+
+            self.log_message(f"[JARVIS MYŚLI]: {thought}")
+
+            if not actions:
+                self.log_message("[JARVIS]: Nie znaleziono żadnych akcji do wykonania.")
+            else:
+                self._execute_actions(actions)
+
+        except Exception as e:
+            self.log_message(f"[BŁĄD WĄTKU]: {e}")
+        finally:
+            self.execute_button.configure(state="normal")
+
+    def _execute_actions(self, actions: list):
+        """Sekwencyjnie wykonuje zlecone przez silnik akcje."""
+        for act in actions:
+            action_type = act.get("type")
+
+            if action_type == "click":
+                x = act.get("x")
+                y = act.get("y")
+                self.log_message(f"[JARVIS AKCJA]: Klikam w punkt ({x}, {y})")
+                try:
+                    click_at(x, y)
+                except Exception as e:
+                    self.log_message(f"[BŁĄD AKCJI]: Nie udało się kliknąć - {e}")
+
+            elif action_type == "type":
+                text = act.get("text", "")
+                self.log_message(f"[JARVIS AKCJA]: Wpisuję tekst: '{text}'")
+                try:
+                    type_text(text)
+                except Exception as e:
+                    self.log_message(f"[BŁĄD AKCJI]: Nie udało się wpisać tekstu - {e}")
+
+            elif action_type == "press":
+                key = act.get("key", "")
+                self.log_message(f"[JARVIS AKCJA]: Naciskam klawisz '{key}'")
+                try:
+                    press_key(key)
+                except Exception as e:
+                    self.log_message(f"[BŁĄD AKCJI]: Nie udało się wcisnąć klawisza - {e}")
+
+            elif action_type == "run_app":
+                query = act.get("query", "")
+                self.log_message(f"[JARVIS AKCJA]: Uruchamiam aplikację: '{query}'")
+                app_path = self.app_scanner.find_app(query)
+
+                try:
+                    # Próba otwarcia zaistniałego pliku
+                    if os.path.exists(app_path):
+                        subprocess.Popen(app_path)
+                    else:
+                        # Może być to nazwa znana w PATH lub alias shella
+                        # Używamy shell=True, jako rozwiązanie uniwersalne
+                        subprocess.Popen(app_path, shell=True)
+                except Exception as e:
+                    self.log_message(f"[BŁĄD AKCJI]: Nie można uruchomić aplikacji - {e}")
+
+            else:
+                self.log_message(f"[OSTRZEŻENIE]: Nierozpoznana akcja: {act}")
 
     def stop_action(self):
         """Metoda wywoływana po kliknięciu przycisku Zatrzymaj."""
