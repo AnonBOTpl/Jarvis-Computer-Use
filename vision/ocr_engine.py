@@ -10,18 +10,17 @@ if os.path.exists(TESSERACT_PATH):
 def extract_text_from_image(image: Image.Image) -> str:
     """
     Przyjmuje obraz PIL i wykonuje na nim lokalny OCR za pomocą Tesseract.
-    Zwraca wyciągnięty tekst. Ze względu na wydajność, operacja powinna
-    być wykonywana w osobnym wątku.
+    Zwraca wyciągnięty tekst. Timeout włączony na poziomie funkcji ułatwia powrót do głównej pętli
+    w przypadku zablokowania lub braku odpowiedzi przez tesseract w określonym czasie (2s).
     """
     try:
         # Konwersja obrazu do skali szarości poprawia jakość OCR
         gray_image = image.convert('L')
-        # Dodanie języka polskiego dla tesseract (wymaga zainstalowanych paczek językowych w OS)
-        # Będziemy używać parametru pol+eng lub zaufamy domyślnemu j. polskiemu systemu.
-        text = pytesseract.image_to_string(gray_image, lang='pol+eng')
+        # timeout=2.0 zabezpiecza proces na FX8300 zapobiegając dead-lockom
+        text = pytesseract.image_to_string(gray_image, lang='pol+eng', timeout=2.0)
         return text.strip()
     except Exception as e:
-        print(f"Błąd silnika OCR: {e}")
+        print(f"Błąd silnika OCR lub przekroczony czas weryfikacji: {e}")
         return ""
 
 def is_text_visible(image: Image.Image, search_text: str) -> bool:

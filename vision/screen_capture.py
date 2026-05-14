@@ -23,16 +23,17 @@ def capture_screen(scale_down: bool = True, target_width: int = 1280) -> Image.I
 
         return img
 
-def capture_window_roi(window_title_keyword: str) -> Image.Image:
+def capture_window_roi(window_title_keyword: str):
     """
     Znajduje pierwsze okno zawierające 'window_title_keyword' w tytule.
-    Zwraca wycinek (ROI) tego okna jako obraz. Zwraca None, jeśli okno nie zostało znalezione.
+    Zwraca wycinek (ROI) tego okna jako obraz oraz jego koordynaty (offset_x, offset_y).
+    Zwraca (None, 0, 0), jeśli okno nie zostało znalezione.
     Ta metoda, "Wizja Selektywna", drastycznie redukuje rozmiar danych wysyłanych do API.
     """
     try:
         windows = gw.getWindowsWithTitle(window_title_keyword)
         if not windows:
-            return None
+            return None, 0, 0
 
         # Wybieramy pierwsze trafienie
         target_win = windows[0]
@@ -43,7 +44,7 @@ def capture_window_roi(window_title_keyword: str) -> Image.Image:
 
         # Zabezpieczenie przed niewłaściwymi wymiarami (np. błędy API Windows)
         if target_win.width <= 0 or target_win.height <= 0:
-            return None
+            return None, 0, 0
 
         with mss.mss() as sct:
             # Definiujemy wycinek bazujący na koordynatach okna
@@ -56,8 +57,34 @@ def capture_window_roi(window_title_keyword: str) -> Image.Image:
             screenshot_bgra = sct.grab(monitor_roi)
             img = Image.frombytes("RGB", screenshot_bgra.size, screenshot_bgra.bgra, "raw", "BGRX")
 
-            # W tym trybie rzadziej zachodzi potrzeba skalowania, wysyłamy oryginalny wycinek, by model mógł precyzyjnie operować na tekstach
-            return img
+            # Zwracamy obraz oraz pozycje lewego górnego rogu (offsety), aby skorygować w systemie koordynaty lokalne na globalne
+            return img, target_win.left, target_win.top
     except Exception as e:
         print(f"Błąd przechwytywania ROI: {e}")
-        return None
+        return None, 0, 0
+
+def capture_region(center_x: int, center_y: int, size: int = 100) -> Image.Image:
+    """
+    Przechwytuje mały wycinek ekranu o rozmiarze size x size, którego środek to (center_x, center_y).
+    Używane do optymalizacji szybkości testów OCR, odciążając obróbkę całego ekranu.
+    """
+    half_size = size // 2
+
+    # Zapobieganie wyjściu poza krawędzie ekranu ujemnymi wymiarami
+    top = max(0, center_y - half_size)
+    left = max(0, center_x - half_size)
+
+    with mss.mss() as sct:
+        monitor_roi = {
+            "top": top,
+            "left": left,
+            "width": size,
+            "height": size
+        }
+        try:
+            screenshot_bgra = sct.grab(monitor_roi)
+            img = Image.frombytes("RGB", screenshot_bgra.size, screenshot_bgra.bgra, "raw", "BGRX")
+            return img
+        except Exception as e:
+            print(f"Błąd przy przechwytywaniu mikro-regionu: {e}")
+            return None

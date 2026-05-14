@@ -24,9 +24,11 @@ def press_key(key: str):
     pyautogui.press(key)
 
 import pyperclip
+import time
 
 def copy_to_clipboard(text: str):
-    """Kopiuje podany tekst do systemowego schowka."""
+    """Kopiuje podany tekst do systemowego schowka (z opóźnieniem do prawidłowej interakcji)."""
+    time.sleep(0.5)
     pyperclip.copy(text)
 
 def get_from_clipboard() -> str:

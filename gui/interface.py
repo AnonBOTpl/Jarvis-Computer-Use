@@ -4,7 +4,7 @@ import threading
 import os
 import subprocess
 from gui.settings import SettingsWindow, load_config
-from vision.screen_capture import capture_screen, capture_window_roi
+from vision.screen_capture import capture_screen, capture_window_roi, capture_region
 from controller.actions import click_at, type_text, press_key, copy_to_clipboard
 from discovery.app_scanner import AppScanner
 from ai_engine.brain import JarvisBrain
@@ -196,7 +196,8 @@ class JarvisApp(ctk.CTk):
             btn_frame = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
             btn_frame.pack(fill="x", pady=2)
 
-            lbl = ctk.CTkLabel(btn_frame, text=query, width=130, anchor="w")
+            # Zastosowanie wraplength w celu łamania dłuższych linii tekstu, zamiast ich ucinania
+            lbl = ctk.CTkLabel(btn_frame, text=query, width=130, wraplength=120, anchor="w", justify="left")
             lbl.pack(side="left", padx=5)
 
             # Przycisk gwiazdki symuluje kliknięcie/wywołanie danej ścieżki
@@ -280,6 +281,8 @@ class JarvisApp(ctk.CTk):
         """Wątek zajmujący się logiką przetwarzania przy użyciu AI z próbami (Autokorekta OCR) oraz "Wizją Selektywną" (ROI)."""
         try:
             target_window = ""
+            global_offset_x = 0
+            global_offset_y = 0
 
             # Pętla autokorekty (max 2 próby)
             for attempt in range(2):
@@ -288,11 +291,12 @@ class JarvisApp(ctk.CTk):
                 screenshot = None
                 if target_window:
                     self.log_message(f"[JARVIS] (Próba {attempt+1}/2): Pobieram wycinek z okna: '{target_window}'...")
-                    screenshot = capture_window_roi(target_window)
+                    screenshot, global_offset_x, global_offset_y = capture_window_roi(target_window)
 
                 if not screenshot:
                     self.log_message(f"[JARVIS] (Próba {attempt+1}/2): Pobieram obraz z całego głównego ekranu...")
                     screenshot = capture_screen(scale_down=True)
+                    global_offset_x, global_offset_y = 0, 0
 
                 self.log_message("[JARVIS]: Wysyłam zapytanie do modelu sztucznej inteligencji...")
                 response = self.brain.process_request(user_input, screenshot)
@@ -315,14 +319,29 @@ class JarvisApp(ctk.CTk):
                     break
                 else:
                     # Wykonanie akcji
-                    self._execute_actions(actions)
+                    self._execute_actions(actions, global_offset_x, global_offset_y)
 
                     # Logika Autokorekty i Weryfikacji (OCR) po wykonaniu akcji
                     has_error = False
                     if attempt == 0:
-                        self.log_message("[JARVIS]: Weryfikuję rezultat zadania...")
-                        # Pobieramy nowy, wyostrzony ekran do lokalnego OCR by uniknąć zapytania sieciowego
-                        verification_screenshot = capture_screen(scale_down=False)
+                        self.log_message("[JARVIS]: Weryfikuję rezultat zadania (OCR)...")
+
+                        verification_screenshot = None
+                        last_click_x, last_click_y = None, None
+
+                        # Pobieramy koordynaty ostatniego kliknięcia, by zawęzić weryfikację
+                        for act in reversed(actions):
+                            if act.get("type") == "click":
+                                last_click_x = act.get("x") + global_offset_x
+                                last_click_y = act.get("y") + global_offset_y
+                                break
+
+                        if last_click_x is not None and last_click_y is not None:
+                            verification_screenshot = capture_region(last_click_x, last_click_y)
+
+                        # Jeśli OCR nie miał kliknięcia, weryfikuje pełny, wyostrzony ekran
+                        if not verification_screenshot:
+                            verification_screenshot = capture_screen(scale_down=False)
 
                         # Definicja potencjalnych komunikatów świadczących o porażce/błędzie (OCR)
                         error_keywords = ["błąd", "error", "nie znaleziono", "nie można", "nie udało się", "failed"]
@@ -367,17 +386,22 @@ class JarvisApp(ctk.CTk):
             )
             self.save_action_button.grid(row=0, column=3, padx=(0, 10), pady=10)
 
-    def _execute_actions(self, actions: list):
-        """Sekwencyjnie wykonuje zlecone przez silnik akcje."""
+    def _execute_actions(self, actions: list, offset_x: int = 0, offset_y: int = 0):
+        """Sekwencyjnie wykonuje zlecone przez silnik akcje, uwzględniając offset "Wizji Selektywnej" (ROI)."""
         for act in actions:
             action_type = act.get("type")
 
             if action_type == "click":
-                x = act.get("x")
-                y = act.get("y")
-                self.log_message(f"[JARVIS AKCJA]: Klikam w punkt ({x}, {y})")
+                local_x = act.get("x")
+                local_y = act.get("y")
+
+                # Przeliczenie na współrzędne globalne monitora
+                global_x = local_x + offset_x
+                global_y = local_y + offset_y
+
+                self.log_message(f"[JARVIS AKCJA]: Klikam w punkt ({global_x}, {global_y})")
                 try:
-                    click_at(x, y)
+                    click_at(global_x, global_y)
                 except Exception as e:
                     self.log_message(f"[BŁĄD AKCJI]: Nie udało się kliknąć - {e}")
 
@@ -419,6 +443,10 @@ class JarvisApp(ctk.CTk):
                     copy_to_clipboard(text)
                 except Exception as e:
                     self.log_message(f"[BŁĄD AKCJI]: Nie udało się skopiować - {e}")
+
+            elif action_type == "log_result":
+                text = act.get("text", "")
+                self.log_message(f"[JARVIS WYNIK]: {text}")
 
             else:
                 self.log_message(f"[OSTRZEŻENIE]: Nierozpoznana akcja: {act}")

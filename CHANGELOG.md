@@ -2,6 +2,14 @@
 
 Wszystkie istotne zmiany w tym projekcie będą dokumentowane w tym pliku.
 
+## [Wersja 1.0.1] - Krytyczne poprawki stabilności i wizji "Top-Tier"
+*   Wprowadzono 2-sekundowy timeout dla silnika `Tesseract`, zapobiegając zamarzaniu procesu weryfikacji na wolniejszych komputerach.
+*   Rozwiązano problem ze złą kalibracją kliknięć wywołanych użyciem "Wizji Selektywnej". Kliknięcia są teraz poprawnie przeliczane według globalnych współrzędnych systemu zamiast kordynatów uciętego okna.
+*   Drastycznie zoptymalizowano prędkość oceny lokalnego OCR w fazie autokorekty - teraz skaner odczytuje tekst z przestrzeni 100x100px na około wykonanego kliknięcia.
+*   Polepszenie estetyki bocznego panelu poprzez aktywację przełamywania tekstu (`wraplength`) w klasie CustomTkinter dla wpisów logów.
+*   Asystent nie szuka od teraz tekstu uderzając ślepo w pulpit – dodano mu logikę `log_result`, służącą do ustrukturyzowanego "Odczytu" informacji i zrzutu na logi tekstowe.
+*   Zwiększenie stabilności systemu klawiatury poprzez integrację ułamkowego wstrzymania procesów (`time.sleep`) przed nadpisaniem zawartości systemowego schowka.
+
 ## [Wersja 1.0.0] - Główne wdrożenie integracji ("Top-Tier")
 
 ### Zmieniono/Rozbudowano:
