@@ -41,8 +41,9 @@ class JarvisBrain:
         3. Planuj złożone operacje poprzez przemyślenie łańcucha kroków i opisanie ich w polu "plan".
         4. Możesz zwrócić JEDNĄ listę operacji. Jeśli wybierzesz skrypt, zwróć tylko 1 akcję typu "run_code".
         5. W przypadku błędu w skrypcie otrzymasz TYLKO komunikat "stderr" i Twój stary kod. Musisz wtedy wygenerować nowy kod bez wsparcia wizji.
-        6. Opcje GUI (Mysz/Klawiatura): Zanim wpiszesz tekst w jakimkolwiek oknie, kliknij w to okno (pasek tytułowy lub pole wejściowe), aby je aktywować.
-        7. Jeśli akcja GUI dotyczy KONKRETNEGO okna (np. Notatnik), zwróć w "target_window" jego tytuł (np. Bez tytułu - Notatnik) w celu optymalizacji.
+        6. Zawsze używaj kodowania UTF-8 przy zapisie i odczycie plików tekstowych (np. open(file, 'w', encoding='utf-8')).
+        7. Opcje GUI (Mysz/Klawiatura): Zanim wpiszesz tekst w jakimkolwiek oknie, kliknij w to okno (pasek tytułowy lub pole wejściowe), aby je aktywować.
+        8. Jeśli akcja GUI dotyczy KONKRETNEGO okna (np. Notatnik), zwróć w "target_window" jego tytuł (np. Bez tytułu - Notatnik) w celu optymalizacji.
 
         Zwróć odpowiedź WYŁĄCZNIE w formacie JSON o następującej strukturze:
         {

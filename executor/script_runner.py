@@ -41,7 +41,12 @@ class ScriptRunner:
         """Realizuje asynchroniczne odczytywanie strumienia danych wyjściowych z wbudowanego polecenia."""
         def target():
             try:
-                # W przypadku PowerShell mogą wystąpić problemy z polskimi znakami, stąd kodowanie okna cmd na 65001 w run_jarvis
+                # Skonfigurowanie zmiennych środowiskowych tak, aby wymusić kodowanie utf-8 w interpretatorze Pythona
+                env = os.environ.copy()
+                env["PYTHONIOENCODING"] = "utf-8"
+
+                # Zabezpieczenie na systemach Windows z PowerShell.
+                # Do Pythona wymuszamy pełne utf-8 bez wyjątków.
                 encoding = "utf-8" if not is_powershell else "cp852"
 
                 self._current_process = subprocess.Popen(
@@ -51,6 +56,7 @@ class ScriptRunner:
                     text=True,
                     encoding=encoding,
                     errors="replace",
+                    env=env,
                     creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
                 )
 
