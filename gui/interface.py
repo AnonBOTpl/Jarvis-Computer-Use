@@ -363,6 +363,7 @@ class JarvisApp(QMainWindow):
         self.sidebar_visible = False
         self.script_preview_visible = False
         self._work_thread = None
+        self.command_worker = None
 
         self._setup_signals()
         self._setup_ui()
