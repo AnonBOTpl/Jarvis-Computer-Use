@@ -17,6 +17,7 @@ from PySide6.QtCore import Qt, QTimer, QObject, Signal, QThread, Slot
 from PySide6.QtGui import QFont, QTextCharFormat, QColor, QAction, QKeySequence
 
 from gui.settings import SettingsDialog, load_config
+from gui.syntax import PythonHighlighter, PowerShellHighlighter
 from gui.token_monitor import TokenMonitor
 from vision.screen_capture import capture_screen, capture_window_roi, capture_region
 from controller.actions import click_at, type_text, press_key, copy_to_clipboard
