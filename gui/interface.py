@@ -22,6 +22,7 @@ from vision.screen_capture import capture_screen, capture_window_roi, capture_re
 from controller.actions import click_at, type_text, press_key, copy_to_clipboard
 from discovery.app_scanner import AppScanner
 from ai_engine.brain import JarvisBrain
+from ai_engine.local_brain import LocalBrain
 from memory.knowledge_base import KnowledgeBase
 from vision.ocr_engine import is_text_visible, set_tesseract_path
 from executor.script_runner import ScriptRunner
@@ -129,10 +130,14 @@ class CommandWorker(QObject):
                     return
 
                 elif len(actions) == 1 and actions[0].get("type") == "request_vision":
-                    self.signals.log.emit(
-                        f"[JARVIS]: {actions[0].get('reason', 'Potrzebuję sprawdzić ekran.')}", "yellow"
-                    )
-                    use_vision_this_turn = True
+                    if isinstance(self.brain, LocalBrain):
+                        self.signals.log.emit("[JARVIS]: Tryb lokalny - pomijam wizje.", "yellow")
+                        use_vision_this_turn = False
+                    else:
+                        self.signals.log.emit(
+                            f"[JARVIS]: {actions[0].get('reason', 'Potrzebuję sprawdzić ekran.')}", "yellow"
+                        )
+                        use_vision_this_turn = True
                     continue
 
                 else:
@@ -578,16 +583,28 @@ class JarvisApp(QMainWindow):
 
     def _init_brain(self):
         config = load_config()
-        if config.get("api_key"):
+        ai_mode = config.get("ai_mode", "api")
+
+        if ai_mode == "local":
             try:
-                self.brain = JarvisBrain(config)
-                self._append_log("[SYSTEM]: Silnik AI pomyślnie załadowany.", "green")
+                self.brain = LocalBrain(config)
+                self._append_log("[SYSTEM]: Lokalny model AI (Ollama) załadowany.", "green")
             except Exception as e:
-                self._append_log(f"[BŁĄD]: Błąd inicjalizacji silnika AI: {e}", "red")
+                self._append_log(f"[BŁĄD]: Błąd inicjalizacji modelu lokalnego: {e}", "red")
+                self.brain = None
         else:
-            self._append_log(
-                "[SYSTEM]: Brak klucza API. Przejdź do 'Ustawienia', aby skonfigurować.", "yellow"
-            )
+            if config.get("api_key"):
+                try:
+                    self.brain = JarvisBrain(config)
+                    self._append_log("[SYSTEM]: Silnik AI (Gemini) pomyślnie załadowany.", "green")
+                except Exception as e:
+                    self._append_log(f"[BŁĄD]: Błąd inicjalizacji silnika AI: {e}", "red")
+                    self.brain = None
+            else:
+                self._append_log(
+                    "[SYSTEM]: Brak klucza API. Przejdź do 'Ustawienia', aby skonfigurować.", "yellow"
+                )
+                self.brain = None
 
         tesseract_path = config.get("tesseract_path", "")
         if tesseract_path:
