@@ -40,6 +40,7 @@ Zwroc odpowiedz WYLACZNIE jako JSON:
 class LocalBrain:
     def __init__(self, config: dict):
         self.model = config.get("local_model", "qwen2.5:3b")
+        self.num_ctx = config.get("num_ctx", 4096)
         base_url = config.get("ollama_url", "http://localhost:11434")
         self.base_url = base_url.rstrip("/")
         self.client = OpenAI(base_url=f"{self.base_url}/v1", api_key="ollama")
@@ -78,7 +79,8 @@ class LocalBrain:
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"},
                 temperature=0.2,
-                timeout=120
+                timeout=120,
+                extra_body={"num_ctx": self.num_ctx}
             )
 
             raw = response.choices[0].message.content

@@ -4,7 +4,7 @@ import logging
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QLineEdit,
     QPushButton, QComboBox, QLabel, QHBoxLayout, QMessageBox,
-    QButtonGroup, QRadioButton, QGroupBox, QCheckBox
+    QButtonGroup, QRadioButton, QGroupBox, QCheckBox, QSpinBox
 )
 from PySide6.QtCore import Qt
 from google import genai
@@ -21,6 +21,7 @@ def load_config():
         "ai_mode": "api",
         "local_model": "qwen2.5:3b",
         "ollama_url": "http://localhost:11434",
+        "num_ctx": 4096,
         "debug_mode": True
     }
     if os.path.exists(CONFIG_FILE):
@@ -107,6 +108,13 @@ class SettingsDialog(QDialog):
         self.ollama_url_edit = QLineEdit()
         self.ollama_url_edit.setText(self.config.get("ollama_url", "http://localhost:11434"))
         local_form.addRow("URL Ollamy:", self.ollama_url_edit)
+
+        self.num_ctx_spin = QSpinBox()
+        self.num_ctx_spin.setRange(1024, 65536)
+        self.num_ctx_spin.setSingleStep(1024)
+        self.num_ctx_spin.setValue(self.config.get("num_ctx", 4096))
+        self.num_ctx_spin.setToolTip("Limit pamieci kontekstu (tokeny). Wiecej = lepsze zrozumienie, ale wiecej VRAM.")
+        local_form.addRow("Limit kontekstu:", self.num_ctx_spin)
 
         test_row = QHBoxLayout()
         self.test_ollama_btn = QPushButton("Sprawdz polaczenie")
@@ -230,6 +238,7 @@ class SettingsDialog(QDialog):
             "ai_mode": "local" if self.local_radio.isChecked() else "api",
             "local_model": self.local_model_edit.text().strip(),
             "ollama_url": self.ollama_url_edit.text().strip().rstrip("/"),
+            "num_ctx": self.num_ctx_spin.value(),
             "debug_mode": self.debug_check.isChecked()
         }
         save_config(new_config)

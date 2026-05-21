@@ -43,6 +43,7 @@ class WorkerSignals(QObject):
     show_script_preview = Signal(str, str)
     hide_script_preview = Signal()
     set_status_text = Signal(str)
+    repair = Signal(str)
 
 
 class CommandWorker(QObject):
@@ -59,6 +60,35 @@ class CommandWorker(QObject):
     def stop(self):
         self._is_running = False
         self.script_runner.stop_execution()
+
+    @Slot(str)
+    def repair_script(self, stderr_str):
+        if not self._is_running:
+            return
+        repair_prompt = (
+            f"Poprzedni kod wygenerował błąd.\n\n"
+            f"Oto zwrócony błąd (stderr):\n{stderr_str}\n\n"
+            f"Zanalizuj ten błąd, napraw kod i wygeneruj nową wersję operując nadal jako run_code. "
+            f"Nie potrzebujesz interfejsu GUI, polegaj wyłącznie na Python/PowerShell."
+        )
+        try:
+            response = self.brain.process_request(repair_prompt, screenshot=None)
+            usage = response.get("usage_metadata")
+            if usage:
+                self.signals.tokens.emit(usage)
+            actions = response.get("actions", [])
+            if len(actions) == 1 and actions[0].get("type") == "run_code":
+                code = actions[0].get("code", "")
+                lang = actions[0].get("language", "python")
+                self.signals.show_script_preview.emit(code, lang)
+            else:
+                self.signals.log.emit("[JARVIS]: Nie potrafię wygenerować poprawki.", "yellow")
+                self.signals.enable_execute.emit(True)
+                self.signals.enable_stop.emit(False)
+        except Exception as e:
+            self.signals.log.emit(f"[BŁĄD REPAIR]: {e}", "red")
+            self.signals.enable_execute.emit(True)
+            self.signals.enable_stop.emit(False)
 
     @Slot(str)
     def process(self, user_input):
@@ -398,14 +428,10 @@ class JarvisApp(QMainWindow):
         self.tokens_label = QLabel("Tokeny (In/Out): 0 / 0")
         self.tokens_label.setStyleSheet("color: #f9e2af; font-size: 11px;")
 
-        self.stats_label = QLabel("CPU: 0% | RAM: 0%")
-        self.stats_label.setStyleSheet("font-size: 12px;")
-
         top_layout.addWidget(self.status_label)
         top_layout.addSpacing(20)
         top_layout.addWidget(self.tokens_label)
         top_layout.addStretch()
-        top_layout.addWidget(self.stats_label)
         top_layout.addSpacing(12)
 
         self.settings_btn = QPushButton("Ustawienia")
@@ -647,8 +673,8 @@ class JarvisApp(QMainWindow):
             cpu = psutil.cpu_percent()
             ram = psutil.virtual_memory().percent
             gpu = self._get_gpu_usage()
-            self.stats_label.setText(f"CPU: {cpu}% | RAM: {ram}%{gpu}")
-            self.cpu_ram_label.setText(f"CPU: {cpu}% | RAM: {ram}%{gpu}")
+            text = f"CPU: {cpu}% | RAM: {ram}%{gpu}"
+            self.cpu_ram_label.setText(text)
         except Exception:
             pass
 
@@ -726,7 +752,8 @@ class JarvisApp(QMainWindow):
         if self.command_worker:
             self.command_worker.stop()
             self.command_thread.quit()
-            self.command_thread.wait()
+            if not self.command_thread.wait(200):
+                self._append_log("[SYSTEM]: Poprzednie żądanie jeszcze trwa - nowe żądanie w kolejce.", "yellow")
 
         self.command_thread = QThread()
         self.command_worker = CommandWorker(
@@ -734,6 +761,7 @@ class JarvisApp(QMainWindow):
             self.signals, self.script_runner
         )
         self.command_worker.moveToThread(self.command_thread)
+        self.signals.repair.connect(self.command_worker.repair_script)
         self.command_thread.started.connect(lambda: self.command_worker.process(user_input))
         self.command_thread.start()
 
@@ -802,7 +830,7 @@ class JarvisApp(QMainWindow):
             self.stop_btn.setEnabled(False)
         else:
             self._append_log("[JARVIS]: Przechwytuję błąd, próbuję naprawić...", "blue")
-            self._process_repair_loop(stderr_str)
+            self.signals.repair.emit(stderr_str)
 
     def _process_repair_loop(self, stderr_str):
         if not self.brain or not self.command_worker:
