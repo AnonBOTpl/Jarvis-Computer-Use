@@ -121,18 +121,18 @@ echo Ollama zainstalowana.
 
 :ollama_done
 echo [4/5] Sprawdzanie modelu lokalnego...
-ollama list 2>nul | findstr /C:"qwen2.5" >nul
-if !errorlevel! equ 0 (
-    echo Model qwen2.5:3b juz pobrany.
+ollama list 2>nul | findstr /C:"dolphin3" >nul
+if %errorlevel% equ 0 (
+    echo Model dolphin3:3b juz pobrany.
     goto ollama_skip_model
 )
-echo Pobieranie modelu qwen2.5:3b (~2GB). To moze zajac kilka minut...
-ollama pull qwen2.5:3b
-if !errorlevel! neq 0 (
+echo Pobieranie modelu dolphin3:3b (~2GB). To moze zajac kilka minut...
+ollama pull dolphin3:3b
+if %errorlevel% neq 0 (
     echo OSTRZEZENIE: Nie udalo sie pobrac modelu.
-    echo Po instalacji uruchom: ollama pull qwen2.5:3b
+    echo Po instalacji uruchom: ollama pull dolphin3:3b
+    goto ollama_skip_model
 )
-
 :ollama_skip_model
 echo [4/5] Ollama OK
 
