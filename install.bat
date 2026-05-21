@@ -125,14 +125,14 @@ echo Sprawdzanie polaczenia z Ollama...
 powershell -Command "try { $r = Invoke-WebRequest -Uri 'http://localhost:11434/api/tags' -TimeoutSec 5 -ErrorAction Stop; exit 0 } catch { exit 1 }" >nul 2>&1
 if %errorlevel% neq 0 (
     echo Ollama nie odpowiada - pomijam pobieranie modelu.
-    echo Po uruchomieniu Ollamy, pobierz recznie: ollama pull dolphin3:3b
+    echo Po uruchomieniu Ollamy, pobierz recznie: ollama pull sam860/dolphin3-qwen2.5:3b
     goto ollama_skip_model
 )
-echo Pobieranie modelu dolphin3:3b (~2GB). To moze zajac kilka minut...
-ollama pull dolphin3:3b
+echo Pobieranie modelu sam860/dolphin3-qwen2.5:3b (~2GB). To moze zajac kilka minut...
+ollama pull sam860/dolphin3-qwen2.5:3b
 if %errorlevel% neq 0 (
     echo OSTRZEZENIE: Nie udalo sie pobrac modelu.
-    echo Po instalacji uruchom: ollama pull dolphin3:3b
+    echo Po instalacji uruchom: ollama pull sam860/dolphin3-qwen2.5:3b
     goto ollama_skip_model
 )
 :ollama_skip_model

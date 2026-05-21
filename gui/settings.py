@@ -1,4 +1,4 @@
-import json
+﻿import json
 import os
 import logging
 from PySide6.QtWidgets import (
@@ -19,7 +19,7 @@ def load_config():
         "model_name": "",
         "tesseract_path": "C:\\Program Files\\Tesseract-OCR\\tesseract.exe",
         "ai_mode": "api",
-        "local_model": "dolphin3:3b",
+        "local_model": "sam860/dolphin3-qwen2.5:3b",
         "ollama_url": "http://localhost:11434",
         "num_ctx": 4096,
         "debug_mode": True
