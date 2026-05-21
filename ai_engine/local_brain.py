@@ -93,6 +93,13 @@ class LocalBrain:
             if "plan" not in result:
                 result["plan"] = []
 
+            if response.usage:
+                result["usage_metadata"] = {
+                    "prompt_token_count": response.usage.prompt_tokens,
+                    "candidates_token_count": response.usage.completion_tokens,
+                    "total_token_count": response.usage.total_tokens,
+                }
+
             return result
 
         except json.JSONDecodeError:

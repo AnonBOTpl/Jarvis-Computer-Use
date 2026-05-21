@@ -1,4 +1,4 @@
-import os
+﻿import os
 import sys
 import json
 import subprocess
@@ -17,7 +17,7 @@ from PySide6.QtCore import Qt, QTimer, QObject, Signal, QThread, Slot
 from PySide6.QtGui import QFont, QTextCharFormat, QColor, QAction, QKeySequence
 
 from gui.settings import SettingsDialog, load_config
-from gui.syntax import PythonHighlighter, PowerShellHighlighter
+from gui.token_monitor import TokenMonitor
 from vision.screen_capture import capture_screen, capture_window_roi, capture_region
 from controller.actions import click_at, type_text, press_key, copy_to_clipboard
 from discovery.app_scanner import AppScanner
@@ -44,6 +44,8 @@ class WorkerSignals(QObject):
     hide_script_preview = Signal()
     set_status_text = Signal(str)
     repair = Signal(str)
+    loading_started = Signal()
+    loading_finished = Signal()
 
 
 class CommandWorker(QObject):
@@ -72,7 +74,9 @@ class CommandWorker(QObject):
             f"Nie potrzebujesz interfejsu GUI, polegaj wyłącznie na Python/PowerShell."
         )
         try:
+            self.signals.loading_started.emit()
             response = self.brain.process_request(repair_prompt, screenshot=None)
+            self.signals.loading_finished.emit()
             usage = response.get("usage_metadata")
             if usage:
                 self.signals.tokens.emit(usage)
@@ -130,6 +134,8 @@ class CommandWorker(QObject):
                         global_offset_x, global_offset_y = 0, 0
 
                 self.signals.log.emit("[JARVIS]: Wysyłam zapytanie do modelu AI...", "blue")
+                self.signals.loading_started.emit()
+                self.signals.loading_finished.emit()
                 response = self.brain.process_request(user_input, screenshot)
 
                 usage = response.get("usage_metadata")
@@ -350,8 +356,6 @@ class JarvisApp(QMainWindow):
         self.setWindowTitle("Jarvis - Asystent AI")
         self.resize(900, 650)
 
-        self.tokens_in = 0
-        self.tokens_out = 0
         self.last_query = ""
         self.last_actions = []
         self.save_action_btn = None
@@ -409,6 +413,8 @@ class JarvisApp(QMainWindow):
         self.signals.show_script_preview.connect(self._show_script_preview)
         self.signals.hide_script_preview.connect(self._hide_script_preview)
         self.signals.set_status_text.connect(lambda t: self.status_label.setText(t))
+        self.signals.loading_started.connect(lambda: self.token_monitor.set_loading(True))
+        self.signals.loading_finished.connect(lambda: self.token_monitor.set_loading(False))
 
     def _setup_ui(self):
         central = QWidget()
@@ -425,12 +431,11 @@ class JarvisApp(QMainWindow):
         self.status_label = QLabel("Stan: Gotowy do działania")
         self.status_label.setStyleSheet("font-size: 14px; font-weight: bold;")
 
-        self.tokens_label = QLabel("Tokeny (In/Out): 0 / 0")
-        self.tokens_label.setStyleSheet("color: #f9e2af; font-size: 11px;")
+        self.token_monitor = TokenMonitor()
 
         top_layout.addWidget(self.status_label)
         top_layout.addSpacing(20)
-        top_layout.addWidget(self.tokens_label)
+        top_layout.addWidget(self.token_monitor)
         top_layout.addStretch()
         top_layout.addSpacing(12)
 
@@ -610,7 +615,19 @@ class JarvisApp(QMainWindow):
             QListWidget::item { padding: 6px; border-bottom: 1px solid #313244; }
             QListWidget::item:hover { background-color: #313244; }
             QStatusBar { background-color: #181825; border-top: 1px solid #313244; color: #6c7086; }
-        """)
+            QFrame#tokenMonitor {
+                background-color: #11111b; border: 1px solid #313244;
+                border-radius: 8px; padding: 0px;
+            }
+            QPushButton#tokenOptionsBtn {
+                background-color: transparent; color: #6c7086;
+                border: none; font-size: 14px; font-weight: bold;
+            }
+            QPushButton#tokenOptionsBtn:hover { color: #cdd6f4; }
+            QMenu { background-color: #313244; color: #cdd6f4; border: 1px solid #45475a; border-radius: 6px; }
+            QMenu::item { padding: 6px 20px; }
+            QMenu::item:selected { background-color: #45475a; }
+            """)
 
     def _init_brain(self):
         config = load_config()
@@ -644,6 +661,11 @@ class JarvisApp(QMainWindow):
         if self.command_worker:
             self.command_worker.debug_mode = config.get("debug_mode", True)
 
+        is_local = ai_mode == "local"
+        model_name = config.get("local_model", "qwen2.5:3b") if is_local else config.get("model_name", "default")
+        num_ctx = config.get("num_ctx", 4096)
+        self.token_monitor.set_model(model_name, num_ctx if is_local else 128000, is_local)
+
     def _append_log(self, message, tag=None):
         color_map = {
             "blue": QColor("#89b4fa"),
@@ -663,22 +685,28 @@ class JarvisApp(QMainWindow):
 
     def _update_tokens(self, usage):
         if usage:
-            self.tokens_in += usage.get("prompt_token_count", 0)
-            self.tokens_out += usage.get("candidates_token_count", 0)
-            self.tokens_label.setText(f"Tokeny (In/Out): {self.tokens_in} / {self.tokens_out}")
+            prompt = usage.get("prompt_token_count", 0)
+            completion = usage.get("candidates_token_count", 0)
+            self.token_monitor.add_usage(prompt, completion)
 
     def _update_system_stats(self):
         try:
             import psutil
             cpu = psutil.cpu_percent()
             ram = psutil.virtual_memory().percent
-            gpu = self._get_gpu_usage()
-            text = f"CPU: {cpu}% | RAM: {ram}%{gpu}"
-            self.cpu_ram_label.setText(text)
+            gpu = getattr(self, '_gpu_cache', '')
+            self.cpu_ram_label.setText(f"CPU: {cpu}% | RAM: {ram}%{gpu}")
         except Exception:
             pass
+        self._refresh_gpu_async()
 
-    def _get_gpu_usage(self):
+    def _refresh_gpu_async(self):
+        if getattr(self, '_gpu_busy', False):
+            return
+        self._gpu_busy = True
+        threading.Thread(target=self._fetch_gpu, daemon=True).start()
+
+    def _fetch_gpu(self):
         try:
             out = subprocess.check_output(
                 ["nvidia-smi", "--query-gpu=utilization.gpu,memory.used,memory.total",
@@ -691,10 +719,11 @@ class JarvisApp(QMainWindow):
                 vram_used = int(parts[1])
                 vram_total = int(parts[2])
                 vram_pct = round(vram_used / vram_total * 100)
-                return f" | GPU: {gpu_pct}% | VRAM: {vram_used}MB/{vram_total}MB ({vram_pct}%)"
+                self._gpu_cache = f" | GPU: {gpu_pct}% | VRAM: {vram_used}MB/{vram_total}MB ({vram_pct}%)"
         except Exception:
-            pass
-        return ""
+            self._gpu_cache = ""
+        finally:
+            self._gpu_busy = False
 
     def _open_settings(self):
         dialog = SettingsDialog(self)
@@ -761,6 +790,10 @@ class JarvisApp(QMainWindow):
             self.signals, self.script_runner
         )
         self.command_worker.moveToThread(self.command_thread)
+        try:
+            self.signals.repair.disconnect()
+        except TypeError:
+            pass
         self.signals.repair.connect(self.command_worker.repair_script)
         self.command_thread.started.connect(lambda: self.command_worker.process(user_input))
         self.command_thread.start()
