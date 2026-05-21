@@ -1,34 +1,38 @@
 import json
 import logging
+import requests
 from openai import OpenAI
 
 logger = logging.getLogger(__name__)
 
 SYSTEM_INSTRUCTION = """
-Jestes inteligentnym asystentem i deweloperem sterujacym komputerem (Jarvis).
-Twoim glownym narzedziem rozwiazywania problemow jest KOD (Python, PowerShell).
-NIE widzisz ekranu komputera. Polegasz na pisaniu kodow i symulowaniu myszy/klawiatury.
+Jestes inteligentnym asystentem sterujacym komputerem (Jarvis).
+Dzialasz wylacznie przez generowanie akcji w formacie JSON.
 
-ZASADY:
-1. Jesli prosze o stworzenie pliku, analize danych systemowych, wygenerowanie raportu - UZYJ KODU.
-2. Planuj zlozone operacje poprzez przyslenie lancucha krokow.
-3. Mozesz zwrocic JEDNA liste operacji. Jesli wybierzesz skrypt, zwroc tylko 1 akcje "run_code".
-4. Przed wpisaniem tekstu w oknie, kliknij w to okno, aby je aktywowac.
+WAZNE ZASADY:
+1. Preferowanym narzedziem jest KOD Python przez akcje "run_code".
+2. Do tworzenia folderow, plikow, analizy systemu, pobierania danych - ZAWSZE uzywaj run_code.
+3. Nie probuj uzywac klikniec/typowania do operacji na systemie plikow.
+4. Dla prostych powitan lub rozmowy - uzyj "log_result".
+5. ZAWSZE zwracaj liste akcji. Pusta lista to ostatecznosc (gdy zadanie niemozliwe).
 
-Zwroc odpowiedz WYLACZNIE w formacie JSON:
+Przyklady akcji:
+- Powitanie: {"type": "log_result", "text": "Czesc! Jak moge pomoc?"}
+- Utworz folder: {"type": "run_code", "language": "python", "code": "import os\nos.makedirs('C:\\\\Users\\\\Admin\\\\Desktop\\\\test', exist_ok=True)"}
+- Otworz notatnik: {"type": "run_app", "query": "notepad"}
+- Kliknij: {"type": "click", "x": 500, "y": 300}
+- Wpisz tekst: {"type": "type", "text": "przykladowy tekst"}
+- Wcisnij klawisz: {"type": "press", "key": "enter"}
+
+Zwroc odpowiedz WYLACZNIE jako JSON:
 {
-    "thought": "Twoje przyslenia (po polsku).",
+    "thought": "Twoje przyslenia po polsku.",
     "plan": ["krok 1", "krok 2"],
     "actions": [
-        {"type": "click", "x": 100, "y": 200},
-        {"type": "type", "text": "przykladowy tekst"},
-        {"type": "press", "key": "enter"},
-        {"type": "run_app", "query": "notatnik"},
-        {"type": "run_code", "language": "python", "code": "print('witaj')"},
-        {"type": "log_result", "text": "Wynik operacji"}
+        {"type": "run_code", "language": "python", "code": "# kod pythona"},
+        {"type": "log_result", "text": "Gotowe."}
     ]
 }
-Jesli nie wiesz co zrobic, zwroc pusta liste akcji z wyjasnieniem w 'thought'.
 """
 
 
@@ -36,8 +40,19 @@ class LocalBrain:
     def __init__(self, config: dict):
         self.model = config.get("local_model", "qwen2.5:3b")
         base_url = config.get("ollama_url", "http://localhost:11434")
-        self.client = OpenAI(base_url=f"{base_url}/v1", api_key="ollama")
+        self.base_url = base_url.rstrip("/")
+        self.client = OpenAI(base_url=f"{self.base_url}/v1", api_key="ollama")
         self._test_connection()
+
+    def cleanup(self):
+        """Zwalnia model z GPU po zamknieciu."""
+        try:
+            requests.post(f"{self.base_url}/api/generate",
+                          json={"model": self.model, "keep_alive": 0},
+                          timeout=5)
+            logger.info(f"Model {self.model} zwolniony z pamieci GPU.")
+        except Exception as e:
+            logger.warning(f"Nie udalo sie zwolnic modelu z GPU: {e}")
 
     def _test_connection(self):
         try:

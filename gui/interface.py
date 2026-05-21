@@ -358,6 +358,10 @@ class JarvisApp(QMainWindow):
         self.preview_worker.stop()
         self.preview_thread.quit()
         self.preview_thread.wait(1000)
+
+        if isinstance(self.brain, LocalBrain):
+            self.brain.cleanup()
+
         event.accept()
 
     def _setup_signals(self):
