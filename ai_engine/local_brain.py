@@ -18,7 +18,8 @@ WAZNE ZASADY:
 
 Przyklady akcji:
 - Powitanie: {"type": "log_result", "text": "Czesc! Jak moge pomoc?"}
-- Utworz folder: {"type": "run_code", "language": "python", "code": "import os\nos.makedirs('C:\\\\Users\\\\Admin\\\\Desktop\\\\test', exist_ok=True)"}
+- Utworz folder: {"type": "run_code", "language": "python", "code": "import os\nos.makedirs('C:/Users/Admin/Desktop/test', exist_ok=True)"}
+- UWAGA: W sciezkach Windows uzywaj forward slash (C:/Users/...) zamiast backslashy.
 - Otworz notatnik: {"type": "run_app", "query": "notepad"}
 - Kliknij: {"type": "click", "x": 500, "y": 300}
 - Wpisz tekst: {"type": "type", "text": "przykladowy tekst"}

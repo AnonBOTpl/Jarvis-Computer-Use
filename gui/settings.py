@@ -4,7 +4,7 @@ import logging
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QLineEdit,
     QPushButton, QComboBox, QLabel, QHBoxLayout, QMessageBox,
-    QButtonGroup, QRadioButton, QGroupBox
+    QButtonGroup, QRadioButton, QGroupBox, QCheckBox
 )
 from PySide6.QtCore import Qt
 from google import genai
@@ -20,7 +20,8 @@ def load_config():
         "tesseract_path": "C:\\Program Files\\Tesseract-OCR\\tesseract.exe",
         "ai_mode": "api",
         "local_model": "qwen2.5:3b",
-        "ollama_url": "http://localhost:11434"
+        "ollama_url": "http://localhost:11434",
+        "debug_mode": True
     }
     if os.path.exists(CONFIG_FILE):
         try:
@@ -127,6 +128,14 @@ class SettingsDialog(QDialog):
 
         layout.addWidget(tesseract_group)
 
+        # --- Debug ---
+        debug_group = QGroupBox("Debugowanie")
+        debug_layout = QVBoxLayout(debug_group)
+        self.debug_check = QCheckBox("Pokazuj JARVIS MYŚLI i JARVIS PLANUJE w logach")
+        self.debug_check.setChecked(self.config.get("debug_mode", True))
+        debug_layout.addWidget(self.debug_check)
+        layout.addWidget(debug_group)
+
         layout.addStretch()
 
         # --- Buttons ---
@@ -220,7 +229,8 @@ class SettingsDialog(QDialog):
             "tesseract_path": self.tesseract_edit.text().strip(),
             "ai_mode": "local" if self.local_radio.isChecked() else "api",
             "local_model": self.local_model_edit.text().strip(),
-            "ollama_url": self.ollama_url_edit.text().strip().rstrip("/")
+            "ollama_url": self.ollama_url_edit.text().strip().rstrip("/"),
+            "debug_mode": self.debug_check.isChecked()
         }
         save_config(new_config)
         QMessageBox.information(self, "Zapisano", "Ustawienia zostaly zapisane.")

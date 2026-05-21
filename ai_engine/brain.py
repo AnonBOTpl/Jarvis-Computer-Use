@@ -47,9 +47,10 @@ class JarvisBrain:
 
         Przykłady:
         - Powitanie: [{"type": "log_result", "text": "Cześć! Jak mogę pomóc?"}]
-        - Utwórz folder: [{"type": "run_code", "language": "python", "code": "import os\nos.makedirs('ścieżka', exist_ok=True)"}]
+        - Utwórz folder: [{"type": "run_code", "language": "python", "code": "import os\nos.makedirs('C:/Users/Admin/Desktop/test', exist_ok=True)"}]
         - Otwórz notatnik: [{"type": "run_app", "query": "notepad"}]
         - Kliknij i wpisz: [{"type": "click", "x": 100, "y": 200}, {"type": "type", "text": "hello"}]
+        - UWAGA: W ścieżkach Windows używaj forward slash (C:/Users/...) zamiast backslashy.
 
         Zwróć odpowiedź WYŁĄCZNIE w formacie JSON:
         {

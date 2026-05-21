@@ -54,6 +54,7 @@ class CommandWorker(QObject):
         self.signals = signals
         self.script_runner = script_runner
         self._is_running = True
+        self.debug_mode = True
 
     def stop(self):
         self._is_running = False
@@ -113,10 +114,10 @@ class CommandWorker(QObject):
                 if suggested_target:
                     target_window = suggested_target
 
-                self.signals.log.emit(f"[JARVIS MYŚLI]: {thought}", "blue")
-
-                if plan:
-                    self.signals.log.emit(f"[JARVIS PLANUJE]: {', '.join(plan)}", "blue")
+                if self.debug_mode:
+                    self.signals.log.emit(f"[JARVIS MYŚLI]: {thought}", "blue")
+                    if plan:
+                        self.signals.log.emit(f"[JARVIS PLANUJE]: {', '.join(plan)}", "blue")
 
                 if not actions:
                     self.signals.log.emit("[JARVIS]: Nie znaleziono żadnych akcji do wykonania.", "yellow")
@@ -614,6 +615,9 @@ class JarvisApp(QMainWindow):
         if tesseract_path:
             set_tesseract_path(tesseract_path)
 
+        if self.command_worker:
+            self.command_worker.debug_mode = config.get("debug_mode", True)
+
     def _append_log(self, message, tag=None):
         color_map = {
             "blue": QColor("#89b4fa"),
@@ -642,10 +646,29 @@ class JarvisApp(QMainWindow):
             import psutil
             cpu = psutil.cpu_percent()
             ram = psutil.virtual_memory().percent
-            self.stats_label.setText(f"CPU: {cpu}% | RAM: {ram}%")
-            self.cpu_ram_label.setText(f"CPU: {cpu}% | RAM: {ram}%")
+            gpu = self._get_gpu_usage()
+            self.stats_label.setText(f"CPU: {cpu}% | RAM: {ram}%{gpu}")
+            self.cpu_ram_label.setText(f"CPU: {cpu}% | RAM: {ram}%{gpu}")
         except Exception:
             pass
+
+    def _get_gpu_usage(self):
+        try:
+            out = subprocess.check_output(
+                ["nvidia-smi", "--query-gpu=utilization.gpu,memory.used,memory.total",
+                 "--format=csv,noheader,nounits"],
+                encoding="utf-8", timeout=3, creationflags=subprocess.CREATE_NO_WINDOW
+            )
+            parts = out.strip().split(", ")
+            if len(parts) == 3:
+                gpu_pct = parts[0]
+                vram_used = int(parts[1])
+                vram_total = int(parts[2])
+                vram_pct = round(vram_used / vram_total * 100)
+                return f" | GPU: {gpu_pct}% | VRAM: {vram_used}MB/{vram_total}MB ({vram_pct}%)"
+        except Exception:
+            pass
+        return ""
 
     def _open_settings(self):
         dialog = SettingsDialog(self)

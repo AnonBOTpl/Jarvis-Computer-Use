@@ -22,9 +22,11 @@ class ScriptRunner:
         """Uruchamia podany kod języka Python w wirtualnym środowisku agenta."""
         # Zapis do tymczasowego pliku z unikalną nazwą (UUID)
         script_path = f"temp_agent_script_{uuid.uuid4().hex}.py"
+        # Zamiana backslashy na forward slashes - Windows to akceptuje, a unikamy SyntaxError
+        safe_code = code.replace("\\", "/")
         try:
             with open(script_path, "w", encoding="utf-8") as f:
-                f.write(code)
+                f.write(safe_code)
         except IOError as e:
             logger.error(f"Nie można zapisać pliku tymczasowego: {e}")
             if self.error_callback:
