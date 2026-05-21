@@ -1,0 +1,10 @@
+google-genai
+PySide6
+pyautogui
+mss
+pillow
+rapidfuzz
+psutil
+pytesseract
+pygetwindow
+pyperclip

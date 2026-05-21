@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# VENV
+.venv/
+env/
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Konfiguracja
+config.json
+
+# Baza wiedzy
+knowledge.json
+
+# Auto-zapisane skrypty
+scripts/auto_saved/
+
+# Tymczasowe pliki skryptów
+temp_agent_script.py
+
+# Logi
+logs/
