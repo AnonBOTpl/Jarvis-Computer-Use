@@ -1,5 +1,10 @@
 import sys
 import os
+
+# Tłumienie ostrzeżenia DPI - musi być przed importem Qt
+os.environ["QT_ENABLE_HIGHDPI_SCALING"] = "0"
+os.environ["QT_LOGGING_RULES"] = "qt.qpa.window=false"
+
 import logging
 from logging.handlers import RotatingFileHandler
 
@@ -43,9 +48,6 @@ def main():
     log_path = setup_logging()
     logger = logging.getLogger(__name__)
     logger.info(f"Logi zapisywane do: {log_path}")
-
-    # Tłumienie ostrzeżenia DPI w Qt6 na Windows
-    os.environ["QT_ENABLE_HIGHDPI_SCALING"] = "0"
 
     app = QApplication(sys.argv)
     app.setApplicationName("Jarvis - Asystent AI")

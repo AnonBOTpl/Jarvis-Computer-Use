@@ -28,6 +28,10 @@ def load_config():
         try:
             with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                 config = json.load(f)
+            # Migracja starych nazw modeli
+            old_models = {"qwen2.5:3b": "sam860/dolphin3-qwen2.5:3b"}
+            if config.get("local_model") in old_models:
+                config["local_model"] = old_models[config["local_model"]]
             for k, v in defaults.items():
                 config.setdefault(k, v)
             return config
