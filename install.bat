@@ -120,12 +120,17 @@ if !errorlevel! neq 0 (
 echo Ollama zainstalowana.
 
 :ollama_done
+echo.
+set /p PULL_MODEL="Czy chcesz pobrac model lokalny sam860/dolphin3-qwen2.5:3b (~2GB)? (t/n): "
+if /i "!PULL_MODEL!" neq "t" (
+    echo Pomijam pobieranie modelu. Mozesz pobrac recznie: ollama pull sam860/dolphin3-qwen2.5:3b
+    goto ollama_skip_model
+)
 echo [4/5] Sprawdzanie modelu lokalnego...
 echo Sprawdzanie polaczenia z Ollama...
 powershell -Command "try { $r = Invoke-WebRequest -Uri 'http://localhost:11434/api/tags' -TimeoutSec 5 -ErrorAction Stop; exit 0 } catch { exit 1 }" >nul 2>&1
 if %errorlevel% neq 0 (
-    echo Ollama nie odpowiada - pomijam pobieranie modelu.
-    echo Po uruchomieniu Ollamy, pobierz recznie: ollama pull sam860/dolphin3-qwen2.5:3b
+    echo Ollama nie odpowiada - uruchom ja recznie lub pomijn krok.
     goto ollama_skip_model
 )
 echo Pobieranie modelu sam860/dolphin3-qwen2.5:3b (~2GB). To moze zajac kilka minut...

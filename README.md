@@ -1,44 +1,46 @@
 # Jarvis Computer Use Agent
 
-Zaawansowany agent AI o nazwie **Jarvis** przeznaczony do automatycznego sterowania systemem Windows przy użyciu analizy obrazu i działań w interfejsie graficznym, wykorzystujący moc **Google Gemini API**.
-
-Projekt jest w fazie wczesnego rozwoju, zapewniając modułową architekturę do integracji funkcji rozpoznawania obrazu, analizy ekranu, sterowania klawiaturą oraz myszką.
+Zaawansowany agent AI do automatycznego sterowania systemem Windows.
+Dzia\u0142a w dwoch trybach: przez API Google Gemini (z wizja ekranu) lub lokalnie przez Ollama (bez wizji, offline).
 
 ## Wymagania systemowe
 
-*   System operacyjny: Windows
-*   Python: Wersja 3.11 lub nowsza
-*   Zmienne środowiskowe: Poprawnie skonfigurowany klucz API dla Google Gemini (szczegóły wkrótce)
+*   System: Windows 10/11
+*   Python: 3.11+
+*   Opcjonalnie: karta NVIDIA z 6GB+ VRAM (dla lokalnego modelu)
+*   Opcjonalnie: klucz API Google Gemini (dla trybu API)
 
-## Struktura katalogów
+## Szybki start
 
-Projekt został podzielony na kilka głównych modułów:
+1.  `install.bat` - automatyczna instalacja (Python, zaleznosci, Tesseract, Ollama, model)
+2.  `start.bat` - uruchomienie aplikacji
+3.  W oknie ustawien wybierz tryb: API (Gemini) lub Lokalny (Ollama)
 
-*   `gui/` - Graficzny interfejs użytkownika, konfiguracja, terminal zdarzeń i weryfikacja kodu (CustomTkinter).
-*   `vision/` - Przechwytywanie (Wizja selektywna) i analiza obrazu z ekranu (mss, Pillow, Tesseract OCR).
-*   `controller/` - Sterowanie systemem, symulowanie wejścia z klawiatury, myszy i schowka systemowego (PyAutoGUI, pyperclip).
-*   `discovery/` - Funkcje wykrywania i uruchamiania aplikacji na komputerze użytkownika z logiką rozmytą (RapidFuzz).
-*   `ai_engine/` - Główny silnik (Mózg) wysyłający asynchroniczne żądania do Google Gemini. Preferujący tryb Code Interpretera w celu oszczędności punktów wizji.
-*   `memory/` - System pamięci lokalnej (Złota Lista) ograniczający koszty i przyspieszający typowe procesy.
-*   `executor/` - Silnik deweloperski interpretujący wygenerowane kody w logice izolowanej z asynchronicznym wczytywaniem zdarzeń.
+## Struktura projektu
 
-## Instalacja i uruchamianie
+*   `gui/` - Interfejs PySide6 (Qt), ustawienia, podswietlanie sk\u0142adni, monitor tokenow
+*   `vision/` - Przechwytywanie ekranu i OCR (Tesseract)
+*   `controller/` - Sterowanie mysza, klawiatura, schowkiem
+*   `discovery/` - Wykrywanie i uruchamianie aplikacji (RapidFuzz)
+*   `ai_engine/` - Silnik AI: Gemini API (brain.py) lub lokalny Ollama (local_brain.py)
+*   `memory/` - System pamieci (Z\u0142ota Lista)
+*   `executor/` - Wykonawca skryptow Python/PowerShell
 
-Najprostszym sposobem na uruchomienie aplikacji jest skorzystanie z dołączonego skryptu automatyzującego.
+## Komendy g\u0142osne
 
-1.  Pobierz repozytorium.
-2.  Uruchom plik `run_jarvis.bat`.
+Jarvis wykonuje komendy tekstowe:
+- "otworz notatnik" - uruchamia aplikacje
+- "stwórz na pulpicie folder test" - tworzy folder przez skrypt Python
+- "wyszukaj w internecie..." - przeszukuje sie\u0107
+- "cze\u015b\u0107" - zwyk\u0142a rozmowa
 
-Skrypt `run_jarvis.bat` spróbuje automatycznie:
-1.  Wyszukać odpowiednią wersję środowiska Python (min. 3.11).
-2.  Zainstalować języka Python za pomocą narzędzia `winget` (jeśli nie zostanie znaleziony w systemie).
-    *   **Uwaga:** Automatyczna instalacja przez `winget` może wymagać potwierdzenia okna z prośbą o uprawnienia administratora (UAC).
-3.  Utworzyć izolowane wirtualne środowisko `.venv`.
-4.  Zainstalować wymagane oprogramowanie OCR: `Tesseract` (automatycznie).
-5.  Zainstalować wszystkie wymagane biblioteki, takie jak `google-genai`, `customtkinter`, `pyautogui`, `mss`, `pillow`, `rapidfuzz`, `psutil`, `pygetwindow`, `pyperclip`, `pytesseract`.
-6.  Uruchomić główne okno aplikacji.
+## Tryby AI
 
-Alternatywnie możesz ręcznie skonfigurować środowisko używając pliku `main.py` jako punktu wejścia.
+| Tryb | Zalety | Wady |
+|------|--------|------|
+| Gemini API | Wizja ekranu, szybki, dok\u0142adny | Wymaga klucza API, platny |
+| Lokalny (Ollama) | Offline, bezp\u0142atny, prywatny | Wolniejszy, bez wizji ekranu |
 
 ## Uwaga
-Wszelki kod, interfejs graficzny i logi są projektowane zgodnie z językiem polskim.
+
+Interfejs, logi i komentarze s\u0105 w j\u0119zyku polskim.
