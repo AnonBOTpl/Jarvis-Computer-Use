@@ -136,8 +136,8 @@ class CommandWorker(QObject):
 
                 self.signals.log.emit("[JARVIS]: Wysyłam zapytanie do modelu AI...", "blue")
                 self.signals.loading_started.emit()
-                self.signals.loading_finished.emit()
                 response = self.brain.process_request(user_input, screenshot)
+                self.signals.loading_finished.emit()
 
                 usage = response.get("usage_metadata")
                 if usage:
@@ -362,11 +362,11 @@ class JarvisApp(QMainWindow):
         self.save_action_btn = None
         self.sidebar_visible = False
         self.script_preview_visible = False
+        self._work_thread = None
 
         self._setup_signals()
         self._setup_ui()
         self._setup_shortcuts()
-        self._setup_workers()
         self._load_styles()
 
         self.knowledge_base = KnowledgeBase()
@@ -380,6 +380,7 @@ class JarvisApp(QMainWindow):
 
         self.brain = None
         self._init_brain()
+        self._setup_workers()
         self._refresh_sidebar()
 
         self.stats_timer = QTimer()
@@ -389,8 +390,6 @@ class JarvisApp(QMainWindow):
     def closeEvent(self, event):
         if self.command_worker:
             self.command_worker.stop()
-        self.command_thread.quit()
-        self.command_thread.wait(1000)
         self.preview_worker.stop()
         self.preview_thread.quit()
         self.preview_thread.wait(1000)
@@ -555,8 +554,13 @@ class JarvisApp(QMainWindow):
         self.addAction(toggle_sidebar_sc)
 
     def _setup_workers(self):
-        self.command_thread = QThread()
-        self.command_worker = None
+        self.command_worker = CommandWorker(
+            self.brain, self.knowledge_base, self.app_scanner,
+            self.signals, self.script_runner
+        )
+        self.signals.repair.connect(lambda s: threading.Thread(
+            target=self.command_worker.repair_script, args=(s,), daemon=True
+        ).start())
 
         self.preview_thread = QThread()
         self.preview_worker = ScriptPreviewWorker(self.signals, ScriptRunner(
@@ -660,6 +664,7 @@ class JarvisApp(QMainWindow):
             set_tesseract_path(tesseract_path)
 
         if self.command_worker:
+            self.command_worker.brain = self.brain
             self.command_worker.debug_mode = config.get("debug_mode", True)
 
         is_local = ai_mode == "local"
@@ -769,35 +774,32 @@ class JarvisApp(QMainWindow):
     def _execute_action(self):
         user_input = self.input_entry.text().strip()
         if not user_input:
-            self._append_log("[SYSTEM]: Proszę wpisać komendę.", "yellow")
+            self._append_log("[SYSTEM]: Prosz\u0119 wpisa\u0107 komend\u0119.", "yellow")
             return
 
         if not self.brain:
-            self._append_log("[BŁĄD]: Silnik AI nie jest gotowy. Uzupełnij klucz API.", "red")
+            self._append_log("[B\u0141\u0104D]: Silnik AI nie jest gotowy. Uzupe\u0142nij klucz API.", "red")
             return
 
-        self._append_log(f"[UŻYTKOWNIK]: {user_input}", "blue")
+        self._append_log(f"[U\u017bYTKOWNIK]: {user_input}", "blue")
         self.input_entry.clear()
 
-        if self.command_worker:
-            self.command_worker.stop()
-            self.command_thread.quit()
-            if not self.command_thread.wait(200):
-                self._append_log("[SYSTEM]: Poprzednie żądanie jeszcze trwa - nowe żądanie w kolejce.", "yellow")
+        if self._work_thread and self._work_thread.is_alive():
+            self._append_log("[SYSTEM]: Poprzednie \u017c\u0105danie jeszcze trwa - nowe \u017c\u0105danie w kolejce.", "yellow")
 
-        self.command_thread = QThread()
-        self.command_worker = CommandWorker(
-            self.brain, self.knowledge_base, self.app_scanner,
-            self.signals, self.script_runner
+        self.signals.enable_execute.emit(False)
+        self.signals.enable_stop.emit(True)
+
+        self._work_thread = threading.Thread(
+            target=self._run_command, args=(user_input,), daemon=True
         )
-        self.command_worker.moveToThread(self.command_thread)
+        self._work_thread.start()
+
+    def _run_command(self, user_input):
         try:
-            self.signals.repair.disconnect()
-        except TypeError:
-            pass
-        self.signals.repair.connect(self.command_worker.repair_script)
-        self.command_thread.started.connect(lambda: self.command_worker.process(user_input))
-        self.command_thread.start()
+            self.command_worker.process(user_input)
+        except Exception as e:
+            self.signals.log.emit(f"[B\u0141\u0104D]: {e}", "red")
 
     def _stop_action(self):
         self._append_log("[SYSTEM]: Zatrzymywanie procesów...", "yellow")
